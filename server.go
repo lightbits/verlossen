@@ -14,8 +14,9 @@ import (
 )
 
 // TODO: Import these symbols from C header files
-const APP_PROTOCOL = 0xDEADBEEF
-const APP_CONNECT  = 0x00000001
+const APP_PROTOCOL   = 0xDEADBEEF
+const APP_CONNECT    = 0x00000001
+const APP_DISCONNECT = 0x00000002
 const APP_PACKET_SIZE = 64
 const APP_PROTOCOL_SIZE = 4
 const APP_APP_SIZE = 4
@@ -29,6 +30,7 @@ const SV_CLIENT_MAX_RETRIES = 10
 
 type Connection struct {
     Address  string
+    Socket   net.UDPConn
     // TimedOut bool
     // LastPacketReceived time
 }
@@ -48,42 +50,33 @@ server receives such a message, the client times out and is dropped.
 var SV_CONNECTIONS map[string]Connection
 
 func SendToClient(who Connection, data []byte) {
-    // Should all clients always be sending to SV_LISTEN_PORT, or should they
-    // get their own designated port when they send a connection request
-    // to the server?
-
-    // This creates a new socket on the server with a different port each time
-    // i.e. does not do the above.
-    socket, err := net.Dial("udp", who.Address)
-    defer socket.Close()
-    if err != nil {
-        log.Println("Failed to create UDP socket")
-    }
-
-    sent_bytes, err := socket.Write(data)
-    if err != nil {
-        log.Println("Failed to send data to", who.Address, "with", data)
-    }
-    log.Println("Sent", sent_bytes, "to", who.Address)
-
-    // We do not wait for an explicit ack back from the client
-    // If he misses this data, too bad!
+    who.Socket.Write(data)
+    // sent_bytes, err := who.Socket.Write(data)
+    // if err != nil {
+    //     log.Println("Failed to send data to", who.Address, "with", data)
+    // }
+    // log.Println("Sent", sent_bytes, "to", who.Address)
 }
 
 func AcceptIncomingConnection(who string, data *bytes.Reader) {
     // Read hail message (yes, all this code is for that)
     // TODO: Find a better way to do this
     hail_bytes := make([]byte, APP_HAIL_SIZE)
-    _, err := data.Read(hail_bytes)
-    if err != nil {
-        log.Println("Failed connection from", who)
-    }
+    data.Read(hail_bytes)
+    // _, err := data.Read(hail_bytes)
+    // if err != nil {
+    //     log.Println("Failed connection from", who)
+    // }
     hail_length := bytes.Index(hail_bytes, []byte{0})
     hail := string(hail_bytes[:hail_length])
     log.Println(who, "wishes to connect:", hail)
 
     // Add client to list of active connections
-    connection := Connection{who}
+    client_sock, err := net.Dial("udp", who)
+    if err != nil {
+        log.Println("Failed to create UDP socket for client")
+    }
+    connection := Connection{who, client_sock}
     SV_CONNECTIONS[who] = connection
 
     // Send response
@@ -93,11 +86,27 @@ func AcceptIncomingConnection(who string, data *bytes.Reader) {
     }
 
     response := Response{Protocol: APP_PROTOCOL}
-    copy(response.Welcome[:], []byte("Hello... you!"))
+    copy(response.Welcome[:], []byte("Server says hello!"))
     blob := new(bytes.Buffer)
     binary.Write(blob, binary.LittleEndian, response)
 
     SendToClient(connection, blob.Bytes())
+}
+
+func ClientRecvWorker(who Connection) {
+    packet := make([]byte, APP_PACKET_SIZE)
+    reader := bytes.NewReader(packet)
+    for {
+        read_bytes, _, _ := who.Socket.ReadFromUDP(packet)
+        var protocol uint32
+        var regards  uint32
+        binary.Read(reader, binary.LittleEndian, &protocol)
+        binary.Read(reader, binary.LittleEndian, &regards)
+        switch regards {
+        case APP_DISCONNECT:
+            log.Println(who.Address, "disconnected")
+        }
+    }
 }
 
 func main() {
@@ -142,6 +151,8 @@ func main() {
         switch regards {
         case APP_CONNECT:
             AcceptIncomingConnection(who, reader)
+        case APP_DISCONNECT:
+            log.Println(who, "disconnected")
         }
     }
 }
