@@ -147,13 +147,55 @@ PlatformRendererClear()
     SDL_RenderClear(app.renderer);
 }
 
+GameTexture
+PlatformLoadTexture(const char *asset_name)
+{
+    SDL_Surface *surface;
+    SDL_Texture *texture;
+    char path[1024] = {};
+    sprintf(path, "./data/%s", asset_name);
+    surface = SDL_LoadBMP(path);
+    SDL_SetColorKey(surface, SDL_TRUE, SDL_MapRGB(surface->format, 255, 0, 255));
+    if (!surface)
+    {
+        SDL_Log("Asset \"%s\" could not be found in data directory",
+            asset_name);
+        exit(-1);
+    }
+    texture = SDL_CreateTextureFromSurface(app.renderer, surface);
+    SDL_FreeSurface(surface);
+
+    GameTexture result = {};
+    SDL_QueryTexture(texture, 0, 0, &result.width, &result.height);
+    result.data = (void*)texture;
+    return result;
+}
+
+void
+PlatformBlit(GameTexture texture,
+    int src_x, int src_y, int src_w, int src_h,
+    int dst_x, int dst_y, int dst_w, int dst_h)
+{
+    SDL_Rect src;
+    src.x = src_x;
+    src.y = src_y;
+    src.w = src_w;
+    src.h = src_h;
+    SDL_Rect dst;
+    dst.x = dst_x;
+    dst.y = dst_y;
+    dst.w = dst_w;
+    dst.h = dst_h;
+    SDL_RenderCopy(app.renderer, (SDL_Texture*)texture.data, &src, &dst);
+}
+
 int
 wmain(int argc, wchar_t **argv)
 {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
         return -1;
-    app.window_width = 600;
-    app.window_height = 300;
+    app.window_width = 640;
+    app.window_height = 320;
     app.title = "Verlossen";
 
     app.window = SDL_CreateWindow(
@@ -168,26 +210,20 @@ wmain(int argc, wchar_t **argv)
     if (!app.renderer)
         return -1;
 
-    int texture_width = app.window_width / 4;
-    int texture_height = app.window_height / 4;
+    GameRenderer renderer = {};
+    renderer.SetColor   = PlatformRendererSetColor;
+    renderer.DrawLine   = PlatformRendererDrawLine;
+    renderer.Clear      = PlatformRendererClear;
+    renderer.Blit       = PlatformBlit;
+    renderer.res_x      = 320;
+    renderer.res_y      = 160;
+    SDL_RenderSetLogicalSize(app.renderer, renderer.res_x, renderer.res_y);
 
-    // app.texture = SDL_CreateTexture(
-    //     app.renderer,
-    //     SDL_PIXELFORMAT_ARGB8888,
-    //     SDL_TEXTUREACCESS_STREAMING,
-    //     texture_width, texture_height);
-
-    GameFramebuffer framebuffer = {};
-    // framebuffer.pixels = new uint32[texture_width * texture_height];
-    // framebuffer.width = texture_width;
-    // framebuffer.height = texture_height;
-
-    GameMemory memory = {};
-    memory.frame_time = 1.0f / 60.0f;
+    GameMemory memory   = {};
+    memory.frame_time   = 1.0f / 60.0f;
     memory.elapsed_time = 0.0f;
-    memory.renderer.SetColor = PlatformRendererSetColor;
-    memory.renderer.DrawLine = PlatformRendererDrawLine;
-    memory.renderer.Clear    = PlatformRendererClear;
+    memory.renderer     = renderer;
+    memory.LoadTexture  = PlatformLoadTexture;
 
     GameInput input = {};
 
@@ -222,14 +258,9 @@ wmain(int argc, wchar_t **argv)
             }
         }
 
-        // SDL_UpdateTexture(
-        //     app.texture, NULL,
-        //     framebuffer.pixels,
-        //     texture_width * sizeof(uint32));
-        // SDL_RenderCopy(app.renderer, app.texture, NULL, NULL);
-
-        GameUpdateAndRender(framebuffer, memory, input);
+        GameUpdateAndRender(memory, input);
         SDL_RenderPresent(app.renderer);
+
         uint64 frame_end = SDL_GetPerformanceCounter();
         memory.elapsed_time = GetElapsedTime(game_begin, frame_end);
         memory.frame_time = GetElapsedTime(frame_begin, frame_end);

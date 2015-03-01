@@ -18,77 +18,77 @@
 #define PAL16_SKYBLUE     0x31A2F2FF
 #define PAL16_CLOUDBLUE   0xB2DCEFFF
 
-void SetPixel(GameFramebuffer &framebuffer, int x, int y, uint32 color)
+uint32 PAL16[16] = {
+    PAL16_VOID,
+    PAL16_ASH,
+    PAL16_BLIND,
+    PAL16_BLOODRED,
+    PAL16_PIGMEAT,
+    PAL16_OLDPOOP,
+    PAL16_NEWPOOP,
+    PAL16_BLAZE,
+    PAL16_ZORNSKIN,
+    PAL16_SHADEGREEN,
+    PAL16_LEAFGREEN,
+    PAL16_SLIMEGREEN,
+    PAL16_NIGHTBLUE,
+    PAL16_SEABLUE,
+    PAL16_SKYBLUE,
+    PAL16_CLOUDBLUE
+};
+
+void DrawSprite(GameRenderer *render, GameTexture texture, int x, int y)
 {
-    framebuffer.pixels[y * framebuffer.width + x] = color;
+    render->Blit(texture,
+        0, 0, texture.width, texture.height,
+        x, y, texture.width, texture.height);
 }
 
-void DrawLine(GameFramebuffer &framebuffer, vec2 p1, vec2 p2)
+void LoadAssets(GameMemory &memory)
 {
-    // Convert from normalized coordinates to pixel coordinates
-    float x1 = p1.x * framebuffer.width;
-    float x2 = p2.x * framebuffer.width;
-    float y1 = p1.y * framebuffer.height;
-    float y2 = p2.y * framebuffer.height;
-
-    float dx = x2 - x1;
-    float dy = y2 - y1;
-    int n = max(abs(dx), abs(dy));
-    for (int i = 0; i <= n; i++)
-    {
-        float t = (float)i / (float)n;
-        int x = round(x1 + dx * t);
-        int y = round(y1 + dy * t);
-        x = max(min(x, framebuffer.width - 1), 0);
-        y = max(min(y, framebuffer.height - 1), 0);
-        SetPixel(framebuffer, x, y, 0xffffffff);
-    }
+    memory.assets.bg   = memory.LoadTexture("plains.bmp");
+    memory.assets.dude = memory.LoadTexture("dude_sw.bmp");
 }
 
-void GameUpdateAndRender(GameFramebuffer &framebuffer,
-                         GameMemory &memory,
-                         GameInput &input)
+void GameUpdateAndRender(GameMemory &memory, GameInput &input)
 {
-    GameState *state = (GameState*)&memory;
+    GameState    *state  = (GameState*)&memory;
+    GameRenderer *render = (GameRenderer*)&memory.renderer;
+    GameAssets   *assets = (GameAssets*)&memory.assets;
 
     if (!memory.is_initialized)
     {
+        LoadAssets(memory);
         memory.is_initialized = true;
     }
 
-    GameRenderer *rnd = (GameRenderer*)&memory.renderer;
-    rnd->SetColor(PAL16_CLOUDBLUE);
-    rnd->Clear();
-    rnd->SetColor(PAL16_BLOODRED);
-    rnd->DrawLine(10, 10, 100, 50);
+    render->SetColor(PAL16_VOID);
+    render->Clear();
+    DrawSprite(render, assets->bg, 0, 0);
 
-    // float t = memory.elapsed_time;
-    // for (int y = 0; y < framebuffer.height; y++)
-    // {
-    //     for (int x = 0; x < framebuffer.width; x++)
-    //     {
-    //         uint8 r = uint8(y + 10.0f * t) % 64;
-    //         uint8 g = uint8(x + 10.0f * t) % 64;
-    //         uint8 b = 128;
-    //         uint8 a = 255;
-    //         uint32 color = (a << 24) | (r << 16) | (g << 8) | b;
-    //         framebuffer.pixels[y * framebuffer.width + x] = color;
-    //     }
-    // }
+    internal vec2 cursor = Vec2(0.5f, 0.5f);
+    if (input.btn_left.is_down)
+        cursor.x -= 0.1f * memory.frame_time;
+    else if (input.btn_right.is_down)
+        cursor.x += 0.1f * memory.frame_time;
+    if (input.btn_up.is_down)
+        cursor.y -= 0.1f * memory.frame_time;
+    else if (input.btn_down.is_down)
+        cursor.y += 0.1f * memory.frame_time;
 
-    // internal vec2 line_end = Vec2(0.5f, 0.5f);
-    // if (input.btn_left.is_down)
-    //     line_end.x -= memory.frame_time;
-    // else if (input.btn_right.is_down)
-    //     line_end.x += memory.frame_time;
-    // if (input.btn_up.is_down)
-    //     line_end.y -= memory.frame_time;
-    // else if (input.btn_down.is_down)
-    //     line_end.y += memory.frame_time;
-    // DrawLine(framebuffer, Vec2(0.1f, 0.1f), line_end);
-    // for (int i = 0; i < 64; i++)
-    // {
-    //     float a = i / 63.0f;
-    //     DrawLine(framebuffer, Vec2(0.1f, 0.1f), line_end + Vec2(a, 0.0f));
-    // }
+    for (int c = 0; c < 16 ; c++)
+    {
+        int mod = int(4.0f * memory.elapsed_time);
+        render->SetColor(PAL16[(c + mod) % 16]);
+        int len = 4;
+        for (int run = 0; run < 4; run++)
+        {
+            int x = c * len + run;
+            render->DrawLine(x, 0, x, 16 * len);
+        }
+    }
+
+    DrawSprite(render, assets->dude,
+        int(cursor.x * render->res_x),
+        int(cursor.y * render->res_y));
 }
