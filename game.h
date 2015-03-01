@@ -1,18 +1,40 @@
 #ifndef _game_h_
 #define _game_h_
+#define MaxPlayerCount 2
 #include "matrix.h"
 #include "platform.h"
+
+enum PlayerState
+{
+    PLAYER_INIT,
+    PLAYER_IDLE,
+    PLAYER_JMP1,
+    PLAYER_JMP2,
+    PLAYER_JMP3,
+    PLAYER_IDLE_JMP,
+    PLAYER_FALLING
+};
 
 struct GamePlayer
 {
     vec2 position;
     vec2 velocity;
+    vec2 acceleration;
     vec2 size;
+    float movespeed;
+    float jump_timer;
+    float jump_duration;
+    PlayerState state;
 };
 
 struct GameState
 {
-    GamePlayer player;
+    GamePlayer players[MaxPlayerCount];
+    int next_player_index;
+
+    float tile_side_in_meters;
+    float tile_side_in_pixels;
+    float pixels_per_meter;
 };
 
 struct GameTexture
@@ -34,25 +56,25 @@ struct GameRenderer
     renderer_draw_line *DrawLine;
     renderer_clear     *Clear;
     renderer_blit      *Blit;
-    int                 res_x;
-    int                 res_y;
+    int res_x;
+    int res_y;
 };
 
 struct GameAssets
 {
     GameTexture bg;
-    GameTexture dude;
+    GameTexture hero;
 };
 
 typedef GameTexture load_texture(const char *asset_name);
 struct GameMemory
 {
-    bool          is_initialized;
-    float         frame_time;
-    float         elapsed_time;
+    bool is_initialized;
+    GameAssets assets;
+    GameState state;
+
+    // Debug functions
     load_texture *LoadTexture;
-    GameRenderer  renderer;
-    GameAssets    assets;
 };
 
 struct GameButton
@@ -62,13 +84,19 @@ struct GameButton
 
 struct GameInput
 {
-    GameButton btn_action;
-    GameButton btn_left;
-    GameButton btn_right;
-    GameButton btn_up;
-    GameButton btn_down;
+    float frame_time;
+    float elapsed_time;
+    GameButton action1;
+    GameButton action2;
+    GameButton left;
+    GameButton right;
+    GameButton up;
+    GameButton down;
 };
 
-void GameUpdateAndRender(GameMemory &memory, GameInput &input);
+void
+GameUpdateAndRender(GameMemory &memory,
+                    GameRenderer &renderer,
+                    GameInput &input);
 
 #endif

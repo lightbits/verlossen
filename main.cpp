@@ -211,21 +211,20 @@ wmain(int argc, wchar_t **argv)
         return -1;
 
     GameRenderer renderer = {};
-    renderer.SetColor   = PlatformRendererSetColor;
-    renderer.DrawLine   = PlatformRendererDrawLine;
-    renderer.Clear      = PlatformRendererClear;
-    renderer.Blit       = PlatformBlit;
-    renderer.res_x      = 320;
-    renderer.res_y      = 160;
+    renderer.SetColor  = PlatformRendererSetColor;
+    renderer.DrawLine  = PlatformRendererDrawLine;
+    renderer.Clear     = PlatformRendererClear;
+    renderer.Blit      = PlatformBlit;
+    renderer.res_x     = 320;
+    renderer.res_y     = 160;
     SDL_RenderSetLogicalSize(app.renderer, renderer.res_x, renderer.res_y);
 
-    GameMemory memory   = {};
-    memory.frame_time   = 1.0f / 60.0f;
-    memory.elapsed_time = 0.0f;
-    memory.renderer     = renderer;
-    memory.LoadTexture  = PlatformLoadTexture;
+    GameMemory memory  = {};
+    memory.LoadTexture = PlatformLoadTexture;
 
-    GameInput input = {};
+    GameInput input    = {};
+    input.frame_time   = 1.0f / 60.0f;
+    input.elapsed_time = 0.0f;
 
     app.running = true;
     float target_frame_time = 1.0f / 60.0f;
@@ -246,11 +245,12 @@ wmain(int argc, wchar_t **argv)
                 bool is_down = event.type == SDL_KEYDOWN;
                 switch (event.key.keysym.sym)
                 {
-                    case SDLK_z:     input.btn_action.is_down = is_down; break;
-                    case SDLK_LEFT:  input.btn_left.is_down   = is_down; break;
-                    case SDLK_RIGHT: input.btn_right.is_down  = is_down; break;
-                    case SDLK_UP:    input.btn_up.is_down     = is_down; break;
-                    case SDLK_DOWN:  input.btn_down.is_down   = is_down; break;
+                    case SDLK_z:     input.action1.is_down = is_down; break;
+                    case SDLK_x:     input.action2.is_down = is_down; break;
+                    case SDLK_LEFT:  input.left.is_down    = is_down; break;
+                    case SDLK_RIGHT: input.right.is_down   = is_down; break;
+                    case SDLK_UP:    input.up.is_down      = is_down; break;
+                    case SDLK_DOWN:  input.down.is_down    = is_down; break;
                 }
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     app.running = false;
@@ -258,12 +258,12 @@ wmain(int argc, wchar_t **argv)
             }
         }
 
-        GameUpdateAndRender(memory, input);
+        GameUpdateAndRender(memory, renderer, input);
         SDL_RenderPresent(app.renderer);
 
         uint64 frame_end = SDL_GetPerformanceCounter();
-        memory.elapsed_time = GetElapsedTime(game_begin, frame_end);
-        memory.frame_time = GetElapsedTime(frame_begin, frame_end);
+        input.elapsed_time = GetElapsedTime(game_begin, frame_end);
+        input.frame_time = GetElapsedTime(frame_begin, frame_end);
         frame_begin = frame_end;
     }
 

@@ -1,94 +1,206 @@
 #include "game.h"
+#include "palette.h"
+#include "intrinsics.h"
+#define assert(expression) if(!(expression)) {*(int *)0 = 0;}
 
-#define internal static
-#define PAL16_VOID        0x000000FF
-#define PAL16_ASH         0x9D9D9DFF
-#define PAL16_BLIND       0xFFFFFFFF
-#define PAL16_BLOODRED    0xBE2633FF
-#define PAL16_PIGMEAT     0xE06F8BFF
-#define PAL16_OLDPOOP     0x493C2BFF
-#define PAL16_NEWPOOP     0xA46422FF
-#define PAL16_BLAZE       0xEB8931FF
-#define PAL16_ZORNSKIN    0xF7E26BFF
-#define PAL16_SHADEGREEN  0x2F484EFF
-#define PAL16_LEAFGREEN   0x44891AFF
-#define PAL16_SLIMEGREEN  0xA3CE27FF
-#define PAL16_NIGHTBLUE   0x1B2632FF
-#define PAL16_SEABLUE     0x005784FF
-#define PAL16_SKYBLUE     0x31A2F2FF
-#define PAL16_CLOUDBLUE   0xB2DCEFFF
-
-uint32 PAL16[16] = {
-    PAL16_VOID,
-    PAL16_ASH,
-    PAL16_BLIND,
-    PAL16_BLOODRED,
-    PAL16_PIGMEAT,
-    PAL16_OLDPOOP,
-    PAL16_NEWPOOP,
-    PAL16_BLAZE,
-    PAL16_ZORNSKIN,
-    PAL16_SHADEGREEN,
-    PAL16_LEAFGREEN,
-    PAL16_SLIMEGREEN,
-    PAL16_NIGHTBLUE,
-    PAL16_SEABLUE,
-    PAL16_SKYBLUE,
-    PAL16_CLOUDBLUE
-};
-
-void DrawSprite(GameRenderer *render, GameTexture texture, int x, int y)
+void
+DrawSprite(GameRenderer &render, GameTexture texture, int x, int y)
 {
-    render->Blit(texture,
+    render.Blit(texture,
         0, 0, texture.width, texture.height,
         x, y, texture.width, texture.height);
 }
 
-void LoadAssets(GameMemory &memory)
+void
+DrawDebugRectangle(GameRenderer &render, int x, int y, int w, int h)
 {
-    memory.assets.bg   = memory.LoadTexture("plains.bmp");
-    memory.assets.dude = memory.LoadTexture("dude_sw.bmp");
+    render.SetColor(PAL16_BLOODRED);
+    render.DrawLine(x, y, x + w, y);
+    render.DrawLine(x + w, y, x + w, y + h);
+    render.DrawLine(x, y, x, y + h);
+    render.DrawLine(x, y + h, x + w, y + h);
 }
 
-void GameUpdateAndRender(GameMemory &memory, GameInput &input)
+void
+LoadAssets(GameMemory &memory)
 {
-    GameState    *state  = (GameState*)&memory;
-    GameRenderer *render = (GameRenderer*)&memory.renderer;
-    GameAssets   *assets = (GameAssets*)&memory.assets;
+    memory.assets.bg   = memory.LoadTexture("plains.bmp");
+    memory.assets.hero = memory.LoadTexture("dude_sw.bmp");
+}
+
+void
+UpdatePlayer(GameInput &input, GameState &state, GamePlayer &player)
+{
+    float dt = input.frame_time;
+    bool jump_key_down  = input.action1.is_down;
+    bool jump_key_up    = !input.action1.is_down;
+    bool jump_timeout   = (player.jump_timer >= player.jump_duration) &&
+                         (player.jump_timer - dt <= player.jump_duration);
+    float ground_height = 1 * state.tile_side_in_meters;
+    bool hit_ground     = player.position.y +
+                         player.velocity.y * dt <= ground_height;
+    bool lost_ground    = player.position.y > ground_height;
+
+    float gravity = -1.0f;
+    player.acceleration.y = 0.0f;
+    float jump_acceleration = 14.0f;
+
+    switch (player.state)
+    {
+        case PLAYER_INIT:
+        {
+            if (lost_ground)
+            {
+                player.state = PLAYER_FALLING;
+            }
+            else
+            {
+                player.state = PLAYER_IDLE;
+            }
+        } break;
+        case PLAYER_IDLE:
+        {
+            player.acceleration.y = 0.0f;
+            player.velocity.y = 0.0f;
+            if (jump_key_down)
+            {
+                player.state = PLAYER_JMP1;
+                player.jump_timer = 0.0f;
+            }
+            else if (lost_ground)
+            {
+                player.state = PLAYER_FALLING;
+            }
+        } break;
+        case PLAYER_JMP1:
+        {
+            player.acceleration.y = gravity + jump_acceleration;
+            player.jump_timer += dt;
+            if (jump_key_up)
+            {
+                player.state = PLAYER_JMP3;
+            }
+            else if (jump_timeout)
+            {
+                player.state = PLAYER_JMP2;
+            }
+        } break;
+        case PLAYER_JMP2:
+        {
+            player.acceleration.y = gravity;
+            if (jump_key_up)
+            {
+                player.state = PLAYER_JMP3;
+            }
+            else if (hit_ground)
+            {
+                player.state = PLAYER_IDLE_JMP;
+                player.position.y = ground_height;
+                player.velocity.y = 0.0f;
+                player.acceleration.y = 0.0f;
+            }
+        } break;
+        case PLAYER_JMP3:
+        {
+            player.acceleration.y = gravity;
+            if (hit_ground)
+            {
+                player.state = PLAYER_IDLE;
+                player.position.y = ground_height;
+                player.velocity.y = 0.0f;
+                player.acceleration.y = 0.0f;
+            }
+        } break;
+        case PLAYER_IDLE_JMP:
+        {
+            player.acceleration.y = 0.0f;
+            if (jump_key_up)
+            {
+                player.state = PLAYER_IDLE;
+            }
+            else if (lost_ground)
+            {
+                player.state = PLAYER_FALLING;
+            }
+        } break;
+        case PLAYER_FALLING:
+        {
+            player.acceleration.y = gravity;
+            if (hit_ground)
+            {
+                player.state = PLAYER_IDLE;
+                player.position.y = ground_height;
+                player.velocity.y = 0.0f;
+                player.acceleration.y = 0.0f;
+            }
+        } break;
+    }
+
+    player.acceleration.x = 0.0f;
+    if (input.left.is_down)
+        player.acceleration.x = -14.0f;
+    else if (input.right.is_down)
+        player.acceleration.x = +14.0f;
+
+    float friction = player.velocity.x * 7.0f;
+    player.acceleration.x -= friction;
+
+    player.velocity += player.acceleration * dt;
+    player.position += player.velocity * dt +
+                       player.acceleration * dt * dt * 0.5f;
+}
+
+void
+PushPlayer(GameMemory &memory)
+{
+    assert(memory.state.next_player_index < MaxPlayerCount);
+    GamePlayer player = {};
+    player.position  = Vec2(2.0f, 2.0f);
+    player.velocity  = Vec2(0.0f, 0.0f);
+    player.size      = Vec2(0.8f, 1.5f);
+    player.movespeed = 0.1f;
+    memory.state.players[memory.state.next_player_index++] = player;
+}
+
+void
+GameUpdateAndRender(GameMemory   &memory,
+                    GameRenderer &render,
+                    GameInput    &input)
+{
+    GameAssets *assets = &memory.assets;
 
     if (!memory.is_initialized)
     {
         LoadAssets(memory);
+        PushPlayer(memory);
+        memory.state.tile_side_in_meters = 1.00f;
+        memory.state.tile_side_in_pixels = 16.0f;
+        memory.state.pixels_per_meter = memory.state.tile_side_in_pixels /
+                                        memory.state.tile_side_in_meters;
         memory.is_initialized = true;
     }
 
-    render->SetColor(PAL16_VOID);
-    render->Clear();
+    for (int i = 0; i < memory.state.next_player_index; i++)
+        UpdatePlayer(input, memory.state, memory.state.players[i]);
+
+    render.SetColor(PAL16_VOID);
+    render.Clear();
     DrawSprite(render, assets->bg, 0, 0);
 
-    internal vec2 cursor = Vec2(0.5f, 0.5f);
-    if (input.btn_left.is_down)
-        cursor.x -= 0.1f * memory.frame_time;
-    else if (input.btn_right.is_down)
-        cursor.x += 0.1f * memory.frame_time;
-    if (input.btn_up.is_down)
-        cursor.y -= 0.1f * memory.frame_time;
-    else if (input.btn_down.is_down)
-        cursor.y += 0.1f * memory.frame_time;
+    for (int i = 0; i < memory.state.next_player_index; i++)
+    {
+        GamePlayer *player = &memory.state.players[i];
+        int x = player->position.x * memory.state.pixels_per_meter -
+                assets->hero.width / 2;
+        int y = render.res_y -
+                player->position.y * memory.state.pixels_per_meter -
+                assets->hero.height;
+        DrawSprite(render, assets->hero, x, y);
 
-    // for (int c = 0; c < 16 ; c++)
-    // {
-    //     int mod = int(4.0f * memory.elapsed_time);
-    //     render->SetColor(PAL16[(c + mod) % 16]);
-    //     int len = 4;
-    //     for (int run = 0; run < len; run++)
-    //     {
-    //         int x = c * len + run;
-    //         render->DrawLine(x, 0, x, 1);
-    //     }
-    // }
-
-    DrawSprite(render, assets->dude,
-        int(cursor.x * render->res_x),
-        int(cursor.y * render->res_y));
+        int px = player->position.x * render.res_x;
+        int py = render.res_y - player->position.y * render.res_y;
+        int w = player->size.x * memory.state.pixels_per_meter;
+        int h = player->size.y * memory.state.pixels_per_meter;
+        DrawDebugRectangle(render, px - w / 2, py - h, w, h);
+    }
 }

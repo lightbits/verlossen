@@ -1,0 +1,41 @@
+// "Generic 16 color game palette" by Arne
+// http://androidarts.com/palette/16pal.htm
+#ifndef _palette_h_
+#define _palette_h_
+#define PAL16_VOID        0x000000FF
+#define PAL16_ASH         0x9D9D9DFF
+#define PAL16_BLIND       0xFFFFFFFF
+#define PAL16_BLOODRED    0xBE2633FF
+#define PAL16_PIGMEAT     0xE06F8BFF
+#define PAL16_OLDPOOP     0x493C2BFF
+#define PAL16_NEWPOOP     0xA46422FF
+#define PAL16_BLAZE       0xEB8931FF
+#define PAL16_ZORNSKIN    0xF7E26BFF
+#define PAL16_SHADEGREEN  0x2F484EFF
+#define PAL16_LEAFGREEN   0x44891AFF
+#define PAL16_SLIMEGREEN  0xA3CE27FF
+#define PAL16_NIGHTBLUE   0x1B2632FF
+#define PAL16_SEABLUE     0x005784FF
+#define PAL16_SKYBLUE     0x31A2F2FF
+#define PAL16_CLOUDBLUE   0xB2DCEFFF
+
+uint32 PAL16[16] = {
+    PAL16_VOID,
+    PAL16_ASH,
+    PAL16_BLIND,
+    PAL16_BLOODRED,
+    PAL16_PIGMEAT,
+    PAL16_OLDPOOP,
+    PAL16_NEWPOOP,
+    PAL16_BLAZE,
+    PAL16_ZORNSKIN,
+    PAL16_SHADEGREEN,
+    PAL16_LEAFGREEN,
+    PAL16_SLIMEGREEN,
+    PAL16_NIGHTBLUE,
+    PAL16_SEABLUE,
+    PAL16_SKYBLUE,
+    PAL16_CLOUDBLUE
+};
+
+#endif
