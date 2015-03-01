@@ -76,17 +76,17 @@ void GameUpdateAndRender(GameMemory &memory, GameInput &input)
     else if (input.btn_down.is_down)
         cursor.y += 0.1f * memory.frame_time;
 
-    for (int c = 0; c < 16 ; c++)
-    {
-        int mod = int(4.0f * memory.elapsed_time);
-        render->SetColor(PAL16[(c + mod) % 16]);
-        int len = 4;
-        for (int run = 0; run < 4; run++)
-        {
-            int x = c * len + run;
-            render->DrawLine(x, 0, x, 16 * len);
-        }
-    }
+    // for (int c = 0; c < 16 ; c++)
+    // {
+    //     int mod = int(4.0f * memory.elapsed_time);
+    //     render->SetColor(PAL16[(c + mod) % 16]);
+    //     int len = 4;
+    //     for (int run = 0; run < len; run++)
+    //     {
+    //         int x = c * len + run;
+    //         render->DrawLine(x, 0, x, 1);
+    //     }
+    // }
 
     DrawSprite(render, assets->dude,
         int(cursor.x * render->res_x),
