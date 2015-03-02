@@ -4,3 +4,5 @@
 *.pdb
 *.exe
 *.ilk
+*.suo
+*.manifest

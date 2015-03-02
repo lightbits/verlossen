@@ -25,7 +25,7 @@ void
 LoadAssets(GameMemory &memory)
 {
     memory.assets.bg   = memory.LoadTexture("plains.bmp");
-    memory.assets.hero = memory.LoadTexture("dude_sw.bmp");
+    memory.assets.hero = memory.LoadTexture("dude_nbp.bmp");
 }
 
 void
@@ -41,9 +41,8 @@ UpdatePlayer(GameInput &input, GameState &state, GamePlayer &player)
                          player.velocity.y * dt <= ground_height;
     bool lost_ground    = player.position.y > ground_height;
 
-    float gravity = -1.0f;
-    player.acceleration.y = 0.0f;
-    float jump_acceleration = 14.0f;
+    float gravity = -9.81f;
+    player.acceleration.y = gravity;
 
     switch (player.state)
     {
@@ -74,7 +73,7 @@ UpdatePlayer(GameInput &input, GameState &state, GamePlayer &player)
         } break;
         case PLAYER_JMP1:
         {
-            player.acceleration.y = gravity + jump_acceleration;
+            player.acceleration.y = gravity + player.jump_acceleration;
             player.jump_timer += dt;
             if (jump_key_up)
             {
@@ -138,9 +137,9 @@ UpdatePlayer(GameInput &input, GameState &state, GamePlayer &player)
 
     player.acceleration.x = 0.0f;
     if (input.left.is_down)
-        player.acceleration.x = -14.0f;
+        player.acceleration.x = -player.run_acceleration;
     else if (input.right.is_down)
-        player.acceleration.x = +14.0f;
+        player.acceleration.x = +player.run_acceleration;
 
     float friction = player.velocity.x * 7.0f;
     player.acceleration.x -= friction;
@@ -158,7 +157,10 @@ PushPlayer(GameMemory &memory)
     player.position  = Vec2(2.0f, 2.0f);
     player.velocity  = Vec2(0.0f, 0.0f);
     player.size      = Vec2(0.8f, 1.5f);
-    player.movespeed = 0.1f;
+    player.run_acceleration = 22.0f;
+    player.jump_timer = 0.0f;
+    player.jump_duration = 0.05f;
+    player.jump_acceleration = 100.0f;
     memory.state.players[memory.state.next_player_index++] = player;
 }
 
@@ -197,10 +199,10 @@ GameUpdateAndRender(GameMemory   &memory,
                 assets->hero.height;
         DrawSprite(render, assets->hero, x, y);
 
-        int px = player->position.x * render.res_x;
-        int py = render.res_y - player->position.y * render.res_y;
-        int w = player->size.x * memory.state.pixels_per_meter;
-        int h = player->size.y * memory.state.pixels_per_meter;
-        DrawDebugRectangle(render, px - w / 2, py - h, w, h);
+        // int px = player->position.x * memory.state.pixels_per_meter;
+        // int py = render.res_y - player->position.y * memory.state.pixels_per_meter;
+        // int w = player->size.x * memory.state.pixels_per_meter;
+        // int h = player->size.y * memory.state.pixels_per_meter;
+        // DrawDebugRectangle(render, px - w / 2, py - h, w, h);
     }
 }

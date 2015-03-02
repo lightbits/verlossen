@@ -21,9 +21,10 @@ struct GamePlayer
     vec2 velocity;
     vec2 acceleration;
     vec2 size;
-    float movespeed;
+    float run_acceleration;
     float jump_timer;
     float jump_duration;
+    float jump_acceleration;
     PlayerState state;
 };
 

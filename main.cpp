@@ -1,111 +1,16 @@
 #include <stdio.h>
 #include "SDL.h"
-#include "net.h"
 #include "game.h"
 #include "matrix.cpp"
 #include "game.cpp"
+#include "net.h"
 // #include "win32_net.cpp"
-
-const int CL_LISTEN_PORT = 12345;
-const int SV_TICKRATE = 20;
-const int CL_CMDRATE = 20;
-const int CL_UPDATERATE = 20;
-const int CL_PACKET_SIZE = 64;
-const int SV_PACKET_SIZE = 64;
-const int SV_LISTEN_PORT = 65387;
-const int SV_LISTEN_IP0  = 127;
-const int SV_LISTEN_IP1  = 0;
-const int SV_LISTEN_IP2  = 0;
-const int SV_LISTEN_IP3  = 1;
-
-// Message types
-const uint32 APP_PROTOCOL   = 0xDEADBEEF;
-const uint32 APP_CONNECT    = 0x00000001;
-const uint32 APP_DISCONNECT = 0x00000002;
 
 float GetElapsedTime(uint64 begin, uint64 end)
 {
     uint64 frequency = SDL_GetPerformanceFrequency();
     return (float)(end - begin) / (float)frequency;
 }
-
-struct ConnectionResponse
-{
-    uint32 protocol;
-    char welcome[SV_PACKET_SIZE - sizeof(uint32)];
-};
-
-// struct ConnectionRequest
-// {
-//     uint32 protocol;
-//     uint32 regards;
-//     char   hail[CL_PACKET_SIZE - 2 * sizeof(uint32)];
-// };
-
-// struct DisconnectRequest
-// {
-//     uint32 protocol;
-//     uint32 regards;
-// };
-
-// ConnectionResponse
-// ClientConnect(NetAddress *server)
-// {
-//     ConnectionRequest request = {};
-//     request.protocol = APP_PROTOCOL;
-//     request.regards  = APP_CONNECT;
-
-//     // TODO: Replace with safer snprintf
-//     sprintf(request.hail, "Client says hi!");
-//     NetAddress dst = {
-//         SV_LISTEN_IP0,
-//         SV_LISTEN_IP1,
-//         SV_LISTEN_IP2,
-//         SV_LISTEN_IP3,
-//         SV_LISTEN_PORT
-//     };
-
-//     ConnectionResponse response = {};
-//     int read_bytes = 0;
-//     int max_read_tries = 5;
-//     printf("Attempting to connect to %d.%d.%d.%d:%d\n",
-//         dst.ip0, dst.ip1, dst.ip2, dst.ip3, dst.port);
-//     while (read_bytes <= 0)
-//     {
-//         // Send our connection request!
-//         NetSend(&dst, (char*)&request, sizeof(ConnectionRequest));
-
-//         int read_tries = 0;
-//         while (read_bytes <= 0 && read_tries < max_read_tries)
-//         {
-//             read_bytes = NetRead(
-//                 (char*)&response, sizeof(ConnectionResponse), server);
-
-//             if (response.protocol == APP_PROTOCOL)
-//             {
-//                 break;
-//             }
-//             else
-//             {
-//                 read_tries++;
-//                 SDL_Delay(1000);
-//             }
-//         }
-
-//         if (read_bytes <= 0)
-//             printf("Retrying connection\n");
-//     }
-//     return response;
-// }
-
-// void
-// ClientDisconnect(NetAddress *server)
-// {
-//     char data[] = {APP_PROTOCOL, APP_DISCONNECT};
-//     NetSend(server, data, sizeof(data));
-//     printf("Disconnecting!");
-//     SDL_Delay(1000);
-// }
 
 struct App
 {
@@ -120,19 +25,14 @@ struct App
 
 static App app;
 
-struct Message
-{
-    uint32 protocol;
-    uint16 flag;
-    char hail[256];
-};
-
-#define RGB(hex) (hex >> 24) & 0xff, (hex >> 16) & 0xff, (hex >> 8) & 0xff, (hex) & 0xff
-
 void
 PlatformRendererSetColor(uint32 color)
 {
-    SDL_SetRenderDrawColor(app.renderer, RGB(color));
+    SDL_SetRenderDrawColor(app.renderer,
+        (color >> 24) & 0xff,
+        (color >> 16) & 0xff,
+        (color >> 8)  & 0xff,
+        (color)       & 0xff);
 }
 
 void
@@ -190,10 +90,19 @@ PlatformBlit(GameTexture texture,
 }
 
 int
-wmain(int argc, wchar_t **argv)
+main(int argc, char *argv[])
 {
+    // printf("%d", argc);
+    // printf("%s", argv[1]);
+    // printf("hi\n");
+    // float f1, f2;
+    // sscanf((const char*)argv[1], "[%g , %g]", &f1, &f2);
+    // printf("%f, %f", f1, f2);
+    // NetSetPreferredListenPort(12345);
+
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
         return -1;
+
     app.window_width = 640;
     app.window_height = 320;
     app.title = "Verlossen";
@@ -251,6 +160,9 @@ wmain(int argc, wchar_t **argv)
                     case SDLK_RIGHT: input.right.is_down   = is_down; break;
                     case SDLK_UP:    input.up.is_down      = is_down; break;
                     case SDLK_DOWN:  input.down.is_down    = is_down; break;
+
+                    // NetAddress dst = {127, 0, 0, 1, }
+                    // NetSend()
                 }
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     app.running = false;
