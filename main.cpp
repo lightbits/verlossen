@@ -4,7 +4,8 @@
 #include "matrix.cpp"
 #include "game.cpp"
 #include "net.h"
-// #include "win32_net.cpp"
+#include "win32_net.cpp"
+#define CL_UPDATE_RATE 20
 
 float GetElapsedTime(uint64 begin, uint64 end)
 {
@@ -92,13 +93,19 @@ PlatformBlit(GameTexture texture,
 int
 main(int argc, char *argv[])
 {
-    // printf("%d", argc);
-    // printf("%s", argv[1]);
-    // printf("hi\n");
-    // float f1, f2;
-    // sscanf((const char*)argv[1], "[%g , %g]", &f1, &f2);
-    // printf("%f, %f", f1, f2);
-    // NetSetPreferredListenPort(12345);
+    int preferred_listen_port;
+    sscanf(argv[1], "%d", &preferred_listen_port);
+
+    NetAddress dst = {};
+    sscanf(argv[2], "%d.%d.%d.%d:%d",
+           &dst.ip0, &dst.ip1, &dst.ip2, &dst.ip3,
+           &dst.port);
+
+    printf("%d %d.%d.%d.%d:%d",
+           preferred_listen_port,
+           dst.ip0, dst.ip1, dst.ip2, dst.ip3, dst.port);
+
+    NetSetPreferredListenPort(preferred_listen_port);
 
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
         return -1;
@@ -139,6 +146,7 @@ main(int argc, char *argv[])
     float target_frame_time = 1.0f / 60.0f;
     uint64 game_begin = SDL_GetPerformanceCounter();
     uint64 frame_begin = game_begin;
+    uint64 prev_net_update_tick = frame_begin;
     while (app.running) {
         SDL_Event event;
         while (SDL_PollEvent(&event))
@@ -150,7 +158,6 @@ main(int argc, char *argv[])
                 break;
             case SDL_KEYDOWN:
             case SDL_KEYUP:
-
                 bool is_down = event.type == SDL_KEYDOWN;
                 switch (event.key.keysym.sym)
                 {
@@ -160,14 +167,25 @@ main(int argc, char *argv[])
                     case SDLK_RIGHT: input.right.is_down   = is_down; break;
                     case SDLK_UP:    input.up.is_down      = is_down; break;
                     case SDLK_DOWN:  input.down.is_down    = is_down; break;
-
-                    // NetAddress dst = {127, 0, 0, 1, }
-                    // NetSend()
                 }
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     app.running = false;
                 break;
             }
+        }
+
+        char buffer[sizeof(GameNetworkPacket)];
+        NetAddress src = {};
+        int bytes_read = NetRead(buffer, sizeof(GameNetworkPacket), &src);
+        if (bytes_read > 0)
+        {
+            GameNetworkPacket packet = *(GameNetworkPacket*)buffer;
+            memory.network.incoming = packet;
+            memory.network.fresh_update = true;
+        }
+        else
+        {
+            memory.network.fresh_update = false;
         }
 
         GameUpdateAndRender(memory, renderer, input);
@@ -176,6 +194,13 @@ main(int argc, char *argv[])
         uint64 frame_end = SDL_GetPerformanceCounter();
         input.elapsed_time = GetElapsedTime(game_begin, frame_end);
         input.frame_time = GetElapsedTime(frame_begin, frame_end);
+        if (GetElapsedTime(prev_net_update_tick, frame_end) >
+            1.0f / CL_UPDATE_RATE)
+        {
+            NetSend(&dst, (char*)&memory.network.outgoing,
+                sizeof(GameNetworkPacket));
+            prev_net_update_tick = frame_end;
+        }
         frame_begin = frame_end;
     }
 

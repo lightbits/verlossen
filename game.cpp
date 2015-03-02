@@ -182,8 +182,23 @@ GameUpdateAndRender(GameMemory   &memory,
         memory.is_initialized = true;
     }
 
-    for (int i = 0; i < memory.state.next_player_index; i++)
-        UpdatePlayer(input, memory.state, memory.state.players[i]);
+    GameNetworkPacket incoming = memory.network.incoming;
+    if (incoming.input.action1.is_down)
+    {
+        if (memory.state.next_player_index == 1)
+        {
+            PushPlayer(memory);
+        }
+    }
+
+    UpdatePlayer(input, memory.state, memory.state.players[0]);
+    UpdatePlayer(incoming.input, memory.state, memory.state.players[1]);
+    if (memory.network.fresh_update)
+    {
+        memory.state.players[1].position = incoming.position;
+    }
+    memory.network.outgoing.position = memory.state.players[0].position;
+    memory.network.outgoing.input = input;
 
     render.SetColor(PAL16_VOID);
     render.Clear();

@@ -67,17 +67,6 @@ struct GameAssets
     GameTexture hero;
 };
 
-typedef GameTexture load_texture(const char *asset_name);
-struct GameMemory
-{
-    bool is_initialized;
-    GameAssets assets;
-    GameState state;
-
-    // Debug functions
-    load_texture *LoadTexture;
-};
-
 struct GameButton
 {
     bool is_down;
@@ -93,6 +82,32 @@ struct GameInput
     GameButton right;
     GameButton up;
     GameButton down;
+};
+
+struct GameNetworkPacket
+{
+    vec2 position;
+    GameInput input;
+};
+
+struct GameNetworkData
+{
+    // TODO: What the heck is this even
+    bool fresh_update;
+    GameNetworkPacket incoming;
+    GameNetworkPacket outgoing;
+};
+
+typedef GameTexture load_texture(const char *asset_name);
+struct GameMemory
+{
+    bool is_initialized;
+    GameAssets assets;
+    GameState state;
+    GameNetworkData network;
+
+    // Debug functions
+    load_texture *LoadTexture;
 };
 
 void
