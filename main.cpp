@@ -56,13 +56,14 @@ PlatformLoadTexture(const char *asset_name)
     char path[1024] = {};
     sprintf(path, "./data/%s", asset_name);
     surface = SDL_LoadBMP(path);
-    SDL_SetColorKey(surface, SDL_TRUE, SDL_MapRGB(surface->format, 255, 0, 255));
     if (!surface)
     {
         SDL_Log("Asset \"%s\" could not be found in data directory",
             asset_name);
         exit(-1);
     }
+    uint32 magenta = SDL_MapRGB(surface->format, 255, 0, 255);
+    SDL_SetColorKey(surface, SDL_TRUE, magenta);
     texture = SDL_CreateTextureFromSurface(app.renderer, surface);
     SDL_FreeSurface(surface);
 
@@ -75,7 +76,8 @@ PlatformLoadTexture(const char *asset_name)
 void
 PlatformBlit(GameTexture texture,
     int src_x, int src_y, int src_w, int src_h,
-    int dst_x, int dst_y, int dst_w, int dst_h)
+    int dst_x, int dst_y, int dst_w, int dst_h,
+    BlitFlip flip)
 {
     SDL_Rect src;
     src.x = src_x;
@@ -87,23 +89,34 @@ PlatformBlit(GameTexture texture,
     dst.y = dst_y;
     dst.w = dst_w;
     dst.h = dst_h;
-    SDL_RenderCopy(app.renderer, (SDL_Texture*)texture.data, &src, &dst);
+    if (flip == BlitFlipNone)
+        SDL_RenderCopy(app.renderer, (SDL_Texture*)texture.data, &src, &dst);
+    else if (flip == BlitFlipHorizontal)
+        SDL_RenderCopyEx(app.renderer, (SDL_Texture*)texture.data,
+                         &src, &dst, 0.0, 0, SDL_FLIP_HORIZONTAL);
 }
 
 int
 main(int argc, char *argv[])
 {
-    int preferred_listen_port;
-    sscanf(argv[1], "%d", &preferred_listen_port);
+    NetAddress dst = {127, 0, 0, 1, 27050};
+    int preferred_listen_port = 27050;
+    if (argc == 3)
+    {
+        sscanf(argv[1], "%d", &preferred_listen_port);
 
-    NetAddress dst = {};
-    sscanf(argv[2], "%d.%d.%d.%d:%d",
-           &dst.ip0, &dst.ip1, &dst.ip2, &dst.ip3,
-           &dst.port);
+        sscanf(argv[2], "%d.%d.%d.%d:%d",
+               &dst.ip0, &dst.ip1, &dst.ip2, &dst.ip3,
+               &dst.port);
 
-    printf("%d %d.%d.%d.%d:%d",
-           preferred_listen_port,
-           dst.ip0, dst.ip1, dst.ip2, dst.ip3, dst.port);
+        printf("%d %d.%d.%d.%d:%d",
+               preferred_listen_port,
+               dst.ip0, dst.ip1, dst.ip2, dst.ip3, dst.port);
+    }
+    else
+    {
+        printf("Format:\n12345 201.220.241.172:54321\n");
+    }
 
     NetSetPreferredListenPort(preferred_listen_port);
 

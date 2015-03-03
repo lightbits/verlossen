@@ -4,6 +4,36 @@
 #include "matrix.h"
 #include "platform.h"
 
+enum BlitFlip
+{
+    BlitFlipNone,
+    BlitFlipHorizontal
+};
+
+struct GameTexture
+{
+    int width;
+    int height;
+    void *data;
+};
+
+#define MaxSpriteFrameCount 16
+struct GameSprite
+{
+    GameTexture texture;
+    int current_frame;
+    int current_animation;
+    float frame_delay; // Milliseconds each frame should last
+    float frame_timer;
+    int frame_count; // Number of frames per animation
+    int anim_count; // Number of rows (of frames)
+    int src_x[MaxSpriteFrameCount]; // X and Y offsets to start of frame
+    int src_y[MaxSpriteFrameCount]; // inside the texture.
+    int src_w;
+    int src_h;
+    bool flipped;
+};
+
 enum PlayerState
 {
     PLAYER_INIT,
@@ -26,6 +56,8 @@ struct GamePlayer
     float jump_duration;
     float jump_acceleration;
     PlayerState state;
+
+    GameSprite sprite;
 };
 
 struct GameState
@@ -38,19 +70,13 @@ struct GameState
     float pixels_per_meter;
 };
 
-struct GameTexture
-{
-    int width;
-    int height;
-    void *data;
-};
-
 typedef void renderer_set_color(uint32 color);
 typedef void renderer_draw_line(int x0, int y0, int x1, int y1);
 typedef void renderer_clear();
 typedef void renderer_blit(GameTexture texture,
     int src_x, int src_y, int src_w, int src_h,
-    int dst_x, int dst_y, int dst_w, int dst_h);
+    int dst_x, int dst_y, int dst_w, int dst_h,
+    BlitFlip flip);
 struct GameRenderer
 {
     renderer_set_color *SetColor;
@@ -63,8 +89,9 @@ struct GameRenderer
 
 struct GameAssets
 {
-    GameTexture bg;
-    GameTexture hero;
+    GameTexture tex_bgnd;
+    GameTexture tex_hero;
+    GameSprite  spr_hero;
 };
 
 struct GameButton
