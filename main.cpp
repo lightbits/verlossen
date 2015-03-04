@@ -137,64 +137,48 @@ struct RingBuffer
 {
     int read_index;
     int write_index;
-    int *data; // generic pointer to externally allocated array
-    int size;  // size of that array
+    uint32 max_data_count;
+    uint8 *data;
 
-    bool Push(int i)
+    void *Push(uint32 size)
     {
         if (write_index == -1)
-            return false;
+            return 0;
         if (read_index == -1)
             read_index = write_index;
-        data[write_index] = i;
-        write_index = (write_index + 1) % size;
+        void *result = data + write_index * size;
+        write_index = (write_index + 1) % max_data_count;
         if (write_index == read_index)
             write_index = -1;
-        return true;
+        return result;
     }
 
-    bool Pop(int *i)
+    void *Pop(uint32 size)
     {
         if (read_index == -1)
-            return false;
+            return 0;
         if (write_index == -1)
             write_index = read_index;
-        *i = data[read_index];
-        data[read_index] = 0;
-        read_index = (read_index + 1) % size;
+        void *result = data + read_index * size;
+        read_index = (read_index + 1) % max_data_count;
         if (read_index == write_index)
             read_index = -1;
-        return true;
+        return result;
     }
 };
 
 RingBuffer
-MakeRingbuffer(int *data, int size)
+MakeRingbuffer(uint8 *buffer, uint32 max_data_count)
 {
     RingBuffer result = {};
-    result.data = data;
-    result.size = size;
+    result.data = buffer;
+    result.max_data_count = max_data_count;
     result.read_index = -1;
     return result;
 }
 
-void
-PrintRingBuffer(RingBuffer &rb)
-{
-    for (int i = 0; i < rb.size; i++)
-    {
-        if (i == rb.read_index)
-            printf("r");
-        else if (i == rb.write_index)
-            printf("w");
-        else
-            printf(" ");
-    }
-    printf("\n");
-    for (int i = 0; i < rb.size; i++)
-        printf("%d", rb.data[i]);
-    printf("\n");
-}
+#define PopStruct(rb, type) ((type*)rb.Pop(sizeof(type)))
+#define PushStruct(rb, type) ((type*)rb.Push(sizeof(type)))
 
 int
 main(int argc, char *argv[])
@@ -257,18 +241,28 @@ main(int argc, char *argv[])
 
     /////////////
     int data[4] = {0, 0, 0, 0};
-    int temp;
-    RingBuffer rb = MakeRingbuffer(data, 4);
-    rb.Push(1); PrintRingBuffer(rb);
-    rb.Push(2); PrintRingBuffer(rb); rb.Pop(&temp); PrintRingBuffer(rb);
-    rb.Push(3); PrintRingBuffer(rb);
-    rb.Push(4); PrintRingBuffer(rb); rb.Pop(&temp); PrintRingBuffer(rb);
-    rb.Pop(&temp); PrintRingBuffer(rb);
-    rb.Pop(&temp); PrintRingBuffer(rb);
-    rb.Push(5); PrintRingBuffer(rb);
-    rb.Push(6); PrintRingBuffer(rb); rb.Pop(&temp); rb.Pop(&temp); rb.Pop(&temp); rb.Pop(&temp); PrintRingBuffer(rb);
-    rb.Push(7); PrintRingBuffer(rb);
-    rb.Push(8); PrintRingBuffer(rb);
+
+    struct Thing
+    {
+        int x;
+        float y;
+    };
+
+    RingBuffer rb = MakeRingbuffer((uint8*)&data, 4);
+    Thing *a = PushStruct(rb, Thing);
+    a->x = 5;
+    a->y = 3.1415f;
+
+    Thing *b = PushStruct(rb, Thing);
+    b->x = 10;
+    b->y = 9.875421;
+
+    Thing *c = PopStruct(rb, Thing);
+    while (c)
+    {
+        printf("%d %f\n", c->x, c->y);
+        c = PopStruct(rb, Thing);
+    }
 
     /*
     Should the server advance all ringbuffers of user
