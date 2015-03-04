@@ -111,18 +111,31 @@ struct GameInput
     GameButton down;
 };
 
-struct GameNetworkPacket
+struct GameNetworkUpdate
 {
     vec2 position;
     GameInput input;
 };
 
+#define MaxUpdatesPerPacket 4
+struct GameNetworkPacket
+{
+    // A client may perform several actions before
+    // their network packet is sent, since the sending
+    // rate is lower than the framerate. To compensate
+    // we may send multiple user updates per packet.
+    // These are ordered chronologically, i.e. updates[0]
+    // happened before updates[1], and should be applied
+    // to the game state chronologically.
+    // GameNetworkUpdate updates[MaxUpdatesPerPacket];
+    // int update_count;
+};
+
 struct GameNetworkData
 {
-    // TODO: What the heck is this even
-    bool fresh_update;
-    GameNetworkPacket incoming;
-    GameNetworkPacket outgoing;
+    // bool new_incoming;
+    // GameNetworkPacket incoming;
+    // GameNetworkPacket outgoing;
 };
 
 typedef GameTexture load_texture(const char *asset_name);

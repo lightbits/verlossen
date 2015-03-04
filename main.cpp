@@ -133,6 +133,69 @@ HandleUserInput(GameInput &input)
     }
 }
 
+struct RingBuffer
+{
+    int read_index;
+    int write_index;
+    int *data; // generic pointer to externally allocated array
+    int size;  // size of that array
+
+    bool Push(int i)
+    {
+        if (write_index == -1)
+            return false;
+        if (read_index == -1)
+            read_index = write_index;
+        data[write_index] = i;
+        write_index = (write_index + 1) % size;
+        if (write_index == read_index)
+            write_index = -1;
+        return true;
+    }
+
+    bool Pop(int *i)
+    {
+        if (read_index == -1)
+            return false;
+        if (write_index == -1)
+            write_index = read_index;
+        *i = data[read_index];
+        data[read_index] = 0;
+        read_index = (read_index + 1) % size;
+        if (read_index == write_index)
+            read_index = -1;
+        return true;
+    }
+};
+
+RingBuffer
+MakeRingbuffer(int *data, int size)
+{
+    RingBuffer result = {};
+    result.data = data;
+    result.size = size;
+    result.read_index = -1;
+    return result;
+}
+
+void
+PrintRingBuffer(RingBuffer &rb)
+{
+    for (int i = 0; i < rb.size; i++)
+    {
+        if (i == rb.read_index)
+            printf("r");
+        else if (i == rb.write_index)
+            printf("w");
+        else
+            printf(" ");
+    }
+    printf("\n");
+    for (int i = 0; i < rb.size; i++)
+        printf("%d", rb.data[i]);
+    printf("\n");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -192,6 +255,49 @@ main(int argc, char *argv[])
     input.frame_time   = 1.0f / 60.0f;
     input.elapsed_time = 0.0f;
 
+    /////////////
+    int data[4] = {0, 0, 0, 0};
+    int temp;
+    RingBuffer rb = MakeRingbuffer(data, 4);
+    rb.Push(1); PrintRingBuffer(rb);
+    rb.Push(2); PrintRingBuffer(rb); rb.Pop(&temp); PrintRingBuffer(rb);
+    rb.Push(3); PrintRingBuffer(rb);
+    rb.Push(4); PrintRingBuffer(rb); rb.Pop(&temp); PrintRingBuffer(rb);
+    rb.Pop(&temp); PrintRingBuffer(rb);
+    rb.Pop(&temp); PrintRingBuffer(rb);
+    rb.Push(5); PrintRingBuffer(rb);
+    rb.Push(6); PrintRingBuffer(rb); rb.Pop(&temp); rb.Pop(&temp); rb.Pop(&temp); rb.Pop(&temp); PrintRingBuffer(rb);
+    rb.Push(7); PrintRingBuffer(rb);
+    rb.Push(8); PrintRingBuffer(rb);
+
+    /*
+    Should the server advance all ringbuffers of user
+    inputs in lockstep, without regard for individual
+    differences in latency?
+
+    Can the server just speed thru a single client's
+    ringbuffer?
+
+    Server:
+        forever:
+            for client in clients
+                for cmd in client.buffer
+                    StepWorld(cmd)
+
+    Probably not. I think stepping the world requires
+    all clients' inputs. Like:
+
+    Server:
+        forever:
+            inputs = {}
+            for client in clients:
+                inputs[client] = client.buffer.read_one()
+            StepWorld(inputs)
+
+    */
+
+    /////////////
+
     app.running = true;
     float target_frame_time = 1.0f / 60.0f;
     uint64 game_begin = SDL_GetPerformanceCounter();
@@ -203,16 +309,18 @@ main(int argc, char *argv[])
         char buffer[sizeof(GameNetworkPacket)];
         NetAddress src = {};
         int bytes_read = NetRead(buffer, sizeof(GameNetworkPacket), &src);
-        if (bytes_read > 0)
-        {
-            GameNetworkPacket packet = *(GameNetworkPacket*)buffer;
-            memory.network.incoming = packet;
-            memory.network.fresh_update = true;
-        }
-        else
-        {
-            memory.network.fresh_update = false;
-        }
+
+        // Should this be a while loop?
+        // if (bytes_read > 0)
+        // {
+        //     GameNetworkPacket packet = *(GameNetworkPacket*)buffer;
+        //     memory.network.incoming = packet;
+        //     memory.network.fresh_update = true;
+        // }
+        // else
+        // {
+        //     memory.network.fresh_update = false;
+        // }
 
         GameUpdateAndRender(memory, renderer, input);
         SDL_RenderPresent(app.renderer);
@@ -221,13 +329,13 @@ main(int argc, char *argv[])
         input.elapsed_time = GetElapsedTime(game_begin, frame_end);
         input.frame_time = GetElapsedTime(frame_begin, frame_end);
 
-        if (GetElapsedTime(prev_net_update_tick, frame_end) >
-            1.0f / CL_UPDATE_RATE)
-        {
-            NetSend(&dst, (char*)&memory.network.outgoing,
-                sizeof(GameNetworkPacket));
-            prev_net_update_tick = frame_end;
-        }
+        // if (GetElapsedTime(prev_net_update_tick, frame_end) >
+        //     1.0f / CL_UPDATE_RATE)
+        // {
+        //     NetSend(&dst, (char*)&memory.network.outgoing,
+        //         sizeof(GameNetworkPacket));
+        //     prev_net_update_tick = frame_end;
+        // }
 
         frame_begin = frame_end;
     }

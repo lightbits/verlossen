@@ -5,6 +5,8 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 4 (March 4. 2015)###
+
 
 ###Day 3 (March 3. 2015)###
 Spent some time making a running animation and a sort of idle animation. The game (if I can call it that) looks alot more spenstig now - as we say in Norway.

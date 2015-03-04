@@ -268,6 +268,20 @@ PushPlayer(GameMemory &memory)
     memory.state.players[memory.state.next_player_index++] = player;
 }
 
+// void
+// PushNetworkUpdate(GameNetworkPacket &packet, GameNetworkUpdate &update)
+// {
+//     if (packet.update_count == MaxUpdatesPerPacket)
+//     {
+//         printf("[Warning] Network transmission rate might be too low\n");
+//     }
+//     else
+//     {
+//         packet.updates[packet.update_count] = update;
+//         packet.update_count++;
+//     }
+// }
+
 void
 GameUpdateAndRender(GameMemory   &memory,
                     GameRenderer &render,
@@ -283,23 +297,33 @@ GameUpdateAndRender(GameMemory   &memory,
         memory.is_initialized = true;
     }
 
-    GameNetworkPacket incoming = memory.network.incoming;
-    if (incoming.input.action1.is_down)
-    {
-        if (memory.state.next_player_index == 1)
-        {
-            PushPlayer(memory);
-        }
-    }
+    // GameNetworkPacket incoming = memory.network.incoming;
+    // if (incoming.input.action1.is_down)
+    // {
+    //     if (memory.state.next_player_index == 1)
+    //     {
+    //         PushPlayer(memory);
+    //     }
+    // }
 
     UpdatePlayer(input, memory.state, memory.state.players[0]);
-    UpdatePlayer(incoming.input, memory.state, memory.state.players[1]);
-    if (memory.network.fresh_update)
-    {
-        memory.state.players[1].position = incoming.position;
-    }
-    memory.network.outgoing.position = memory.state.players[0].position;
-    memory.network.outgoing.input = input;
+    // UpdatePlayer(incoming.input, memory.state, memory.state.players[1]);
+
+    // if (memory.network.incoming_count > 0)
+    // {
+    //     memory.network.incoming_count--;
+    // }
+    // if (memory.network.new_incoming)
+    // {
+    //     memory.state.players[1].position = incoming.position;
+    // }
+
+    // The main thread should send these before we overflow
+    // GameNetworkPacket update = {
+    //     memory.state.players[0].position,
+    //     input
+    // };
+    // PushNetworkUpdate(memory.outgoing, packet);
 
     render.SetColor(PAL16_VOID);
     render.Clear();
