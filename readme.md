@@ -7,6 +7,55 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ###Day 4 (March 4. 2015)###
 
+The hard problems are starting now. After thinking for a bit, I realized
+I need to seperate my game into two modes: Server and Client. The server
+will accept inputs from all players, and advance the world simulation in
+lockstep.
+
+Now here comes the tricky bit. Because I sample input at a lower rate than
+the game framerate, a client may have given multiple inputs since the last
+frame. These need to buffered, and sent as a single packet when it is time
+to send an update. The server then applies the inputs chronologically.
+
+But things get ugly with multiple clients. Look at this approach:
+
+    Server:
+        forever:
+            for client in clients
+                for input in client.buffer
+                    StepWorld(input)
+
+The server spins through a client's buffered inputs, until there are no
+more, and then it goes on to the next client, and spins through their
+inputs. The problem with this is that to simulate the world, we need
+all clients' inputs. The world can not be updated independently per
+client. So we need to do something like:
+
+    Server:
+        forever:
+            inputs_this_step = {}
+            for client in clients:
+                inputs_this_step[client] = client.buffer.read_one()
+            StepWorld(inputs_this_step)
+
+This gets even more ugly when you realize that each client have may have
+different latencies. This means that the simulation input may consist of
+user inputs that were applied at totally different times.
+
+Anyway. To accommodate this, I needed to have a list type that can be
+read from one end, and written to on the other. A first-in-first-out sort
+of thing. So I implemented a ring buffer. It's like an array, but shaped
+like a snake:
+
+![](data/ringbuffer.png)
+
+At any moment, you may read from a location that has been written (blue).
+And you may write to a location that is available (gray). Already read
+locations (red) are made available for writing again. So if you read
+relatively as often as you write, you never run out of space!
+
+* **Compile time**: 1.8 seconds
+* **Player count**: 1 (oh no!)
 
 ###Day 3 (March 3. 2015)###
 Spent some time making a running animation and a sort of idle animation. The game (if I can call it that) looks alot more spenstig now - as we say in Norway.
@@ -14,8 +63,6 @@ Spent some time making a running animation and a sort of idle animation. The gam
 ![](data/hero_run.gif)
 ![](data/hero_stand.gif)
 ![](data/ingame_run.gif)
-
-
 
 Regarding the network code: I'm thinking I'll need to make one of the players a "host" or "master" sort of thing. My argument is that if the game will have enemy entities that both players can interact with, then someone needs to simulate those enemies.
 

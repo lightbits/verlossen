@@ -239,59 +239,6 @@ main(int argc, char *argv[])
     input.frame_time   = 1.0f / 60.0f;
     input.elapsed_time = 0.0f;
 
-    /////////////
-    int data[4] = {0, 0, 0, 0};
-
-    struct Thing
-    {
-        int x;
-        float y;
-    };
-
-    RingBuffer rb = MakeRingbuffer((uint8*)&data, 4);
-    Thing *a = PushStruct(rb, Thing);
-    a->x = 5;
-    a->y = 3.1415f;
-
-    Thing *b = PushStruct(rb, Thing);
-    b->x = 10;
-    b->y = 9.875421;
-
-    Thing *c = PopStruct(rb, Thing);
-    while (c)
-    {
-        printf("%d %f\n", c->x, c->y);
-        c = PopStruct(rb, Thing);
-    }
-
-    /*
-    Should the server advance all ringbuffers of user
-    inputs in lockstep, without regard for individual
-    differences in latency?
-
-    Can the server just speed thru a single client's
-    ringbuffer?
-
-    Server:
-        forever:
-            for client in clients
-                for cmd in client.buffer
-                    StepWorld(cmd)
-
-    Probably not. I think stepping the world requires
-    all clients' inputs. Like:
-
-    Server:
-        forever:
-            inputs = {}
-            for client in clients:
-                inputs[client] = client.buffer.read_one()
-            StepWorld(inputs)
-
-    */
-
-    /////////////
-
     app.running = true;
     float target_frame_time = 1.0f / 60.0f;
     uint64 game_begin = SDL_GetPerformanceCounter();
