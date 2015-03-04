@@ -13,6 +13,12 @@ float GetElapsedTime(uint64 begin, uint64 end)
     return (float)(end - begin) / (float)frequency;
 }
 
+enum AppMode
+{
+    AppClient,
+    AppServer
+};
+
 struct App
 {
     SDL_Window *window;
@@ -22,6 +28,7 @@ struct App
     int window_width;
     int window_height;
     bool running;
+    AppMode mode;
 };
 
 static App app;
@@ -96,6 +103,36 @@ PlatformBlit(GameTexture texture,
                          &src, &dst, 0.0, 0, SDL_FLIP_HORIZONTAL);
 }
 
+void
+HandleUserInput(GameInput &input)
+{
+    SDL_Event event;
+    while (SDL_PollEvent(&event))
+    {
+        switch (event.type)
+        {
+        case SDL_QUIT:
+            app.running = false;
+            break;
+        case SDL_KEYDOWN:
+        case SDL_KEYUP:
+            bool is_down = event.type == SDL_KEYDOWN;
+            switch (event.key.keysym.sym)
+            {
+                case SDLK_z:     input.action1.is_down = is_down; break;
+                case SDLK_x:     input.action2.is_down = is_down; break;
+                case SDLK_LEFT:  input.left.is_down    = is_down; break;
+                case SDLK_RIGHT: input.right.is_down   = is_down; break;
+                case SDLK_UP:    input.up.is_down      = is_down; break;
+                case SDLK_DOWN:  input.down.is_down    = is_down; break;
+            }
+            if (event.key.keysym.sym == SDLK_ESCAPE)
+                app.running = false;
+            break;
+        }
+    }
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -161,31 +198,7 @@ main(int argc, char *argv[])
     uint64 frame_begin = game_begin;
     uint64 prev_net_update_tick = frame_begin;
     while (app.running) {
-        SDL_Event event;
-        while (SDL_PollEvent(&event))
-        {
-            switch (event.type)
-            {
-            case SDL_QUIT:
-                app.running = false;
-                break;
-            case SDL_KEYDOWN:
-            case SDL_KEYUP:
-                bool is_down = event.type == SDL_KEYDOWN;
-                switch (event.key.keysym.sym)
-                {
-                    case SDLK_z:     input.action1.is_down = is_down; break;
-                    case SDLK_x:     input.action2.is_down = is_down; break;
-                    case SDLK_LEFT:  input.left.is_down    = is_down; break;
-                    case SDLK_RIGHT: input.right.is_down   = is_down; break;
-                    case SDLK_UP:    input.up.is_down      = is_down; break;
-                    case SDLK_DOWN:  input.down.is_down    = is_down; break;
-                }
-                if (event.key.keysym.sym == SDLK_ESCAPE)
-                    app.running = false;
-                break;
-            }
-        }
+        HandleUserInput(input);
 
         char buffer[sizeof(GameNetworkPacket)];
         NetAddress src = {};
@@ -207,6 +220,7 @@ main(int argc, char *argv[])
         uint64 frame_end = SDL_GetPerformanceCounter();
         input.elapsed_time = GetElapsedTime(game_begin, frame_end);
         input.frame_time = GetElapsedTime(frame_begin, frame_end);
+
         if (GetElapsedTime(prev_net_update_tick, frame_end) >
             1.0f / CL_UPDATE_RATE)
         {
@@ -214,6 +228,7 @@ main(int argc, char *argv[])
                 sizeof(GameNetworkPacket));
             prev_net_update_tick = frame_end;
         }
+
         frame_begin = frame_end;
     }
 

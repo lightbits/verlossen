@@ -8,4 +8,4 @@ set LINKER_OPTIONS=/DEBUG /SUBSYSTEM:CONSOLE /NODEFAULTLIB:"msvcrt.lib"
 REM -MTd
 cl %INCLUDE_PATHS% -Zi -nologo -MDd -EHa- -DDEBUG ..\main.cpp /link %LIB_PATHS% %DEPENDENCIES% %LINKER_OPTIONS% /OUT:verlossen.exe
 popd
-START .\build\verlossen.exe 54321 127.0.0.1:12345
+START .\build\verlossen.exe 127.0.0.1:12345

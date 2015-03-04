@@ -59,6 +59,15 @@ make_sprite(GameTexture texture, float frame_delay,
 }
 
 void
+InitGame(GameMemory &memory)
+{
+    memory.state.tile_side_in_meters = 1.00f;
+    memory.state.tile_side_in_pixels = 16.0f;
+    memory.state.pixels_per_meter = memory.state.tile_side_in_pixels /
+                                    memory.state.tile_side_in_meters;
+}
+
+void
 LoadAssets(GameMemory &memory)
 {
     memory.assets.tex_bgnd = memory.LoadTexture("plains.bmp");
@@ -268,12 +277,9 @@ GameUpdateAndRender(GameMemory   &memory,
 
     if (!memory.is_initialized)
     {
+        InitGame(memory);
         LoadAssets(memory);
         PushPlayer(memory);
-        memory.state.tile_side_in_meters = 1.00f;
-        memory.state.tile_side_in_pixels = 16.0f;
-        memory.state.pixels_per_meter = memory.state.tile_side_in_pixels /
-                                        memory.state.tile_side_in_meters;
         memory.is_initialized = true;
     }
 
