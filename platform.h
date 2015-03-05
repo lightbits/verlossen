@@ -10,4 +10,6 @@ typedef int32_t     int32;
 typedef int16_t     int16;
 typedef int8_t      int8;
 
+float GetElapsedTime(uint64 begin, uint64 end);
+
 #endif
