@@ -101,8 +101,6 @@ struct GameButton
 
 struct GameInput
 {
-    float frame_time;
-    float elapsed_time;
     GameButton action1;
     GameButton action2;
     GameButton left;
@@ -111,48 +109,28 @@ struct GameInput
     GameButton down;
 };
 
-struct GameNetworkUpdate
-{
-    vec2 position;
-    GameInput input;
-};
-
-#define MaxUpdatesPerPacket 4
-struct GameNetworkPacket
-{
-    // A client may perform several actions before
-    // their network packet is sent, since the sending
-    // rate is lower than the framerate. To compensate
-    // we may send multiple user updates per packet.
-    // These are ordered chronologically, i.e. updates[0]
-    // happened before updates[1], and should be applied
-    // to the game state chronologically.
-    // GameNetworkUpdate updates[MaxUpdatesPerPacket];
-    // int update_count;
-};
-
-struct GameNetworkData
-{
-    // bool new_incoming;
-    // GameNetworkPacket incoming;
-    // GameNetworkPacket outgoing;
-};
-
 typedef GameTexture load_texture(const char *asset_name);
 struct GameMemory
 {
-    bool is_initialized;
     GameAssets assets;
     GameState state;
-    GameNetworkData network;
 
     // Debug functions
     load_texture *LoadTexture;
+    int next_player_index;
 };
 
 void
-GameUpdateAndRender(GameMemory &memory,
-                    GameRenderer &renderer,
-                    GameInput &input);
+GameInit(GameMemory &memory);
+
+void
+GameUpdate(GameMemory &memory,
+           GameInput *inputs,
+           int *input_map_player,
+           int input_count,
+           float dt);
+
+void
+GameRender(GameMemory &memory, GameRenderer &renderer);
 
 #endif

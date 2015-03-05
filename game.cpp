@@ -59,17 +59,25 @@ make_sprite(GameTexture texture, float frame_delay,
 }
 
 void
-InitGame(GameMemory &memory)
+PushPlayer(GameMemory &memory)
 {
-    memory.state.tile_side_in_meters = 1.00f;
-    memory.state.tile_side_in_pixels = 16.0f;
-    memory.state.pixels_per_meter = memory.state.tile_side_in_pixels /
-                                    memory.state.tile_side_in_meters;
+    assert(memory.state.next_player_index < MaxPlayerCount);
+    GamePlayer player = {};
+    player.position = Vec2(2.0f, 2.0f);
+    player.velocity = Vec2(0.0f, 0.0f);
+    player.size = Vec2(0.8f, 1.5f);
+    player.run_acceleration = 22.0f;
+    player.jump_timer = 0.0f;
+    player.jump_duration = 0.05f;
+    player.jump_acceleration = 100.0f;
+    player.sprite = memory.assets.spr_hero;
+    memory.state.players[memory.state.next_player_index++] = player;
 }
 
 void
-LoadAssets(GameMemory &memory)
+GameInit(GameMemory &memory)
 {
+    // Load assets
     memory.assets.tex_bgnd = memory.LoadTexture("plains.bmp");
     memory.assets.tex_hero = memory.LoadTexture("hero_sheet.bmp");
 
@@ -78,6 +86,12 @@ LoadAssets(GameMemory &memory)
     memory.assets.spr_hero = make_sprite(
         memory.assets.tex_hero, 0.35f, 2, 3,
         src_x, src_y, 32, 32);
+
+    // Initialize parameters
+    memory.state.tile_side_in_meters = 1.00f;
+    memory.state.tile_side_in_pixels = 16.0f;
+    memory.state.pixels_per_meter = memory.state.tile_side_in_pixels /
+                                    memory.state.tile_side_in_meters;
 }
 
 void
@@ -94,9 +108,8 @@ AnimateSprite(GameSprite &sprite, float dt)
 }
 
 void
-UpdatePlayer(GameInput &input, GameState &state, GamePlayer &player)
+UpdatePlayer(GameInput &input, GameState &state, GamePlayer &player, float dt)
 {
-    float dt = input.frame_time;
     bool jump_key_down  = input.action1.is_down;
     bool jump_key_up    = !input.action1.is_down;
     bool jump_timeout   = (player.jump_timer >= player.jump_duration) &&
@@ -249,82 +262,34 @@ UpdatePlayer(GameInput &input, GameState &state, GamePlayer &player)
     else if (moving_right)
         player.sprite.flipped = false;
 
-    AnimateSprite(player.sprite, input.frame_time);
+    AnimateSprite(player.sprite, dt);
 }
 
 void
-PushPlayer(GameMemory &memory)
+GameUpdate(GameMemory &memory,
+           GameInput *inputs,
+           int *input_map_player,
+           int input_count,
+           float dt)
 {
-    assert(memory.state.next_player_index < MaxPlayerCount);
-    GamePlayer player = {};
-    player.position = Vec2(2.0f, 2.0f);
-    player.velocity = Vec2(0.0f, 0.0f);
-    player.size = Vec2(0.8f, 1.5f);
-    player.run_acceleration = 22.0f;
-    player.jump_timer = 0.0f;
-    player.jump_duration = 0.05f;
-    player.jump_acceleration = 100.0f;
-    player.sprite = memory.assets.spr_hero;
-    memory.state.players[memory.state.next_player_index++] = player;
+    for (int i = 0; i < input_count; i++)
+    {
+        int player_index = input_map_player[i];
+
+        if (player_index >= memory.next_player_index)
+            PushPlayer(memory);
+
+        UpdatePlayer(inputs[i],
+                     memory.state,
+                     memory.state.players[player_index],
+                     dt);
+    }
 }
 
-// void
-// PushNetworkUpdate(GameNetworkPacket &packet, GameNetworkUpdate &update)
-// {
-//     if (packet.update_count == MaxUpdatesPerPacket)
-//     {
-//         printf("[Warning] Network transmission rate might be too low\n");
-//     }
-//     else
-//     {
-//         packet.updates[packet.update_count] = update;
-//         packet.update_count++;
-//     }
-// }
-
 void
-GameUpdateAndRender(GameMemory   &memory,
-                    GameRenderer &render,
-                    GameInput    &input)
+GameRender(GameMemory &memory, GameRenderer &render)
 {
     GameAssets *assets = &memory.assets;
-
-    if (!memory.is_initialized)
-    {
-        InitGame(memory);
-        LoadAssets(memory);
-        PushPlayer(memory);
-        memory.is_initialized = true;
-    }
-
-    // GameNetworkPacket incoming = memory.network.incoming;
-    // if (incoming.input.action1.is_down)
-    // {
-    //     if (memory.state.next_player_index == 1)
-    //     {
-    //         PushPlayer(memory);
-    //     }
-    // }
-
-    UpdatePlayer(input, memory.state, memory.state.players[0]);
-    // UpdatePlayer(incoming.input, memory.state, memory.state.players[1]);
-
-    // if (memory.network.incoming_count > 0)
-    // {
-    //     memory.network.incoming_count--;
-    // }
-    // if (memory.network.new_incoming)
-    // {
-    //     memory.state.players[1].position = incoming.position;
-    // }
-
-    // The main thread should send these before we overflow
-    // GameNetworkPacket update = {
-    //     memory.state.players[0].position,
-    //     input
-    // };
-    // PushNetworkUpdate(memory.outgoing, packet);
-
     render.SetColor(PAL16_VOID);
     render.Clear();
     DrawSprite(render, assets->tex_bgnd, 0, 0);

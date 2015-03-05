@@ -5,6 +5,7 @@
 #include "game.cpp"
 #include "net.h"
 #include "win32_net.cpp"
+#include "palette.h"
 #define CL_UPDATE_RATE 20
 
 float GetElapsedTime(uint64 begin, uint64 end)
@@ -12,12 +13,6 @@ float GetElapsedTime(uint64 begin, uint64 end)
     uint64 frequency = SDL_GetPerformanceFrequency();
     return (float)(end - begin) / (float)frequency;
 }
-
-enum AppMode
-{
-    AppClient,
-    AppServer
-};
 
 struct App
 {
@@ -28,7 +23,6 @@ struct App
     int window_width;
     int window_height;
     bool running;
-    AppMode mode;
 };
 
 static App app;
@@ -103,36 +97,6 @@ PlatformBlit(GameTexture texture,
                          &src, &dst, 0.0, 0, SDL_FLIP_HORIZONTAL);
 }
 
-void
-HandleUserInput(GameInput &input)
-{
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
-    {
-        switch (event.type)
-        {
-        case SDL_QUIT:
-            app.running = false;
-            break;
-        case SDL_KEYDOWN:
-        case SDL_KEYUP:
-            bool is_down = event.type == SDL_KEYDOWN;
-            switch (event.key.keysym.sym)
-            {
-                case SDLK_z:     input.action1.is_down = is_down; break;
-                case SDLK_x:     input.action2.is_down = is_down; break;
-                case SDLK_LEFT:  input.left.is_down    = is_down; break;
-                case SDLK_RIGHT: input.right.is_down   = is_down; break;
-                case SDLK_UP:    input.up.is_down      = is_down; break;
-                case SDLK_DOWN:  input.down.is_down    = is_down; break;
-            }
-            if (event.key.keysym.sym == SDLK_ESCAPE)
-                app.running = false;
-            break;
-        }
-    }
-}
-
 struct RingBuffer
 {
     int read_index;
@@ -180,48 +144,128 @@ MakeRingbuffer(uint8 *buffer, uint32 max_data_count)
 #define PopStruct(rb, type) ((type*)rb.Pop(sizeof(type)))
 #define PushStruct(rb, type) ((type*)rb.Push(sizeof(type)))
 
-int
-main(int argc, char *argv[])
+#define CL_CONNECT 0xDEADBEEF
+#define CL_UPDATE  0xABABABAB
+#define SV_ACCEPT  0xABAD1DEA
+#define SV_UPDATE  0xFABFABFA
+struct ClientPacket
 {
-    NetAddress dst = {127, 0, 0, 1, 27050};
-    int preferred_listen_port = 27050;
-    if (argc == 3)
+    int32 protocol;
+    char  data[256];
+};
+
+struct ServerPacket
+{
+    int32 protocol;
+    char  data[1024];
+};
+
+void
+Server(int listen_port)
+{
+    NetSetPreferredListenPort(listen_port);
+    printf("Listening on port %d\n", listen_port);
+
+    while (1)
     {
-        sscanf(argv[1], "%d", &preferred_listen_port);
+        NetAddress sender = {};
+        char buffer[sizeof(ClientPacket)];
+        int read_bytes = NetRead(buffer, sizeof(ClientPacket), &sender);
+        while (read_bytes > 0)
+        {
+            ClientPacket packet = *(ClientPacket*)buffer;
+            switch (packet.protocol)
+            {
+                case CL_CONNECT:
+                {
+                    printf("%d.%d.%d.%d:%d wants to connect (%s)\n",
+                           sender.ip0, sender.ip1, sender.ip2, sender.ip3,
+                           sender.port, packet.data);
 
-        sscanf(argv[2], "%d.%d.%d.%d:%d",
-               &dst.ip0, &dst.ip1, &dst.ip2, &dst.ip3,
-               &dst.port);
+                    ServerPacket response = {};
+                    response.protocol = SV_ACCEPT;
+                    sprintf(response.data, "Connection accepted.");
+                    printf("Sending %d %s\n", response.protocol, response.data);
+                    NetSend(&sender, (const char*)&response, sizeof(ServerPacket));
+                } break;
+                case CL_UPDATE:
+                {
 
-        printf("%d %d.%d.%d.%d:%d",
-               preferred_listen_port,
-               dst.ip0, dst.ip1, dst.ip2, dst.ip3, dst.port);
+                } break;
+            }
+
+            read_bytes = NetRead(buffer, sizeof(ClientPacket), &sender);
+        }
     }
-    else
+}
+
+void
+HandleUserInput(GameInput &input)
+{
+    SDL_Event event;
+    while (SDL_PollEvent(&event))
     {
-        printf("Format:\n12345 201.220.241.172:54321\n");
+        switch (event.type)
+        {
+        case SDL_QUIT:
+            app.running = false;
+            break;
+        case SDL_KEYDOWN:
+        case SDL_KEYUP:
+            bool is_down = event.type == SDL_KEYDOWN;
+            switch (event.key.keysym.sym)
+            {
+                case SDLK_z:     input.action1.is_down = is_down; break;
+                case SDLK_x:     input.action2.is_down = is_down; break;
+                case SDLK_LEFT:  input.left.is_down    = is_down; break;
+                case SDLK_RIGHT: input.right.is_down   = is_down; break;
+                case SDLK_UP:    input.up.is_down      = is_down; break;
+                case SDLK_DOWN:  input.down.is_down    = is_down; break;
+            }
+            if (event.key.keysym.sym == SDLK_ESCAPE)
+                app.running = false;
+            break;
+        }
     }
+}
 
-    NetSetPreferredListenPort(preferred_listen_port);
+void
+RenderConnectionScreen(GameRenderer &render, float elapsed_time)
+{
+    float speed = 8.0f;
+    int mod = int(speed * elapsed_time) % 16;
+    render.SetColor(PAL16_VOID);
+    render.Clear();
+    for (int i = 0; i < 16; i++)
+    {
+        int seg_width = 16;
+        int seg_height = 2;
+        int left = (render.res_x / 2) - 8 * seg_width;
+        int top = (render.res_y / 2) - seg_height / 2;
+        int bottom = (render.res_y / 2) + seg_height / 2;
+        render.SetColor(PAL16[(i + mod) % 16]);
+        for (int r = 0; r < seg_width; r++)
+        {
+            int x = left + i * seg_width + r;
+            render.DrawLine(x, top, x, bottom);
+        }
+    }
+}
 
-    if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
-        return -1;
-
-    app.window_width = 640;
-    app.window_height = 320;
-    app.title = "Verlossen";
-
+void
+Client(NetAddress server_addr, int listen_port)
+{
     app.window = SDL_CreateWindow(
         app.title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         app.window_width, app.window_height, SDL_WINDOW_OPENGL);
     if (!app.window)
-        return -1;
+        return;
 
     app.renderer = SDL_CreateRenderer(
         app.window, -1,
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!app.renderer)
-        return -1;
+        return;
 
     GameRenderer renderer = {};
     renderer.SetColor  = PlatformRendererSetColor;
@@ -234,51 +278,116 @@ main(int argc, char *argv[])
 
     GameMemory memory  = {};
     memory.LoadTexture = PlatformLoadTexture;
+    GameInit(memory);
 
     GameInput input    = {};
-    input.frame_time   = 1.0f / 60.0f;
-    input.elapsed_time = 0.0f;
 
+    NetSetPreferredListenPort(listen_port);
+
+    ClientPacket request = {};
+    request.protocol = CL_CONNECT;
+    sprintf(request.data, "Client says hello!");
+
+    float  target_frame_time = 1.0f / 60.0f;
+    uint64 game_begin     = SDL_GetPerformanceCounter();
+    uint64 frame_begin    = game_begin;
+    uint64 prev_net_send  = game_begin;
+    float  frame_time     = target_frame_time;
+    float  elapsed_time   = 0.0f;
+    float  retry_interval = 1.0f;
+
+    bool connected = false;
+
+    // Try to connect!
     app.running = true;
-    float target_frame_time = 1.0f / 60.0f;
-    uint64 game_begin = SDL_GetPerformanceCounter();
-    uint64 frame_begin = game_begin;
-    uint64 prev_net_update_tick = frame_begin;
-    while (app.running) {
+    while (app.running)
+    {
         HandleUserInput(input);
 
-        char buffer[sizeof(GameNetworkPacket)];
-        NetAddress src = {};
-        int bytes_read = NetRead(buffer, sizeof(GameNetworkPacket), &src);
+        uint64 curr_tick = SDL_GetPerformanceCounter();
+        if (GetElapsedTime(prev_net_send, curr_tick) >= retry_interval &&
+            !connected)
+        {
+            printf("Attempting to connect\n");
+            NetSend(&server_addr, (const char*)&request, sizeof(ClientPacket));
+            prev_net_send = curr_tick;
+        }
 
-        // Should this be a while loop?
-        // if (bytes_read > 0)
-        // {
-        //     GameNetworkPacket packet = *(GameNetworkPacket*)buffer;
-        //     memory.network.incoming = packet;
-        //     memory.network.fresh_update = true;
-        // }
-        // else
-        // {
-        //     memory.network.fresh_update = false;
-        // }
+        NetAddress sender = {};
+        char buffer[sizeof(ServerPacket)];
+        int read_bytes = NetRead(buffer, sizeof(ServerPacket), &sender);
+        if (read_bytes > 0)
+        {
+            printf("Read some bytes\n");
+            ServerPacket packet = *(ServerPacket*)buffer;
+            switch (packet.protocol)
+            {
+                case SV_ACCEPT:
+                {
+                    printf("Connected to %d.%d.%d.%d:%d (%s)\n",
+                           sender.ip0, sender.ip1, sender.ip2, sender.ip3,
+                           sender.port, packet.data);
+                    connected = true;
+                } break;
 
-        GameUpdateAndRender(memory, renderer, input);
+                case SV_UPDATE:
+                {
+                    printf("Received update.\n");
+                } break;
+            }
+        }
+
+        RenderConnectionScreen(renderer, elapsed_time);
         SDL_RenderPresent(app.renderer);
 
         uint64 frame_end = SDL_GetPerformanceCounter();
-        input.elapsed_time = GetElapsedTime(game_begin, frame_end);
-        input.frame_time = GetElapsedTime(frame_begin, frame_end);
-
-        // if (GetElapsedTime(prev_net_update_tick, frame_end) >
-        //     1.0f / CL_UPDATE_RATE)
-        // {
-        //     NetSend(&dst, (char*)&memory.network.outgoing,
-        //         sizeof(GameNetworkPacket));
-        //     prev_net_update_tick = frame_end;
-        // }
-
+        elapsed_time = GetElapsedTime(game_begin, frame_end);
+        frame_time = GetElapsedTime(frame_begin, frame_end);
         frame_begin = frame_end;
+    }
+}
+
+int
+main(int argc, char *argv[])
+{
+    // if (argc == 3)
+    // {
+    //     sscanf(argv[1], "%d", &preferred_listen_port);
+
+    //     sscanf(argv[2], "%d.%d.%d.%d:%d",
+    //            &dst.ip0, &dst.ip1, &dst.ip2, &dst.ip3,
+    //            &dst.port);
+
+    //     printf("%d %d.%d.%d.%d:%d",
+    //            preferred_listen_port,
+    //            dst.ip0, dst.ip1, dst.ip2, dst.ip3, dst.port);
+    // }
+    // else
+    // {
+    //     printf("Format:\n12345 201.220.241.172:54321\n");
+    // }
+
+    // TODO: Take in server ip and listen port and stuff?
+    bool is_server = false;
+    if (argc == 2)
+    {
+        is_server = true;
+    }
+
+    if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
+        return -1;
+
+    app.window_width = 640;
+    app.window_height = 320;
+    app.title = "Verlossen";
+
+    // TODO: Server should also open window...?
+    if (is_server)
+        Server(12345);
+    else
+    {
+        NetAddress server_addr = {127, 0, 0, 1, 12345};
+        Client(server_addr, 54321);
     }
 
     return 0;
