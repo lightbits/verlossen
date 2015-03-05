@@ -38,11 +38,6 @@ Server(int listen_port)
     int sv_tickrate = 66;
     float sv_tick_time = 1.0f / float(sv_tickrate);
     uint64 initial_tick = SDL_GetPerformanceCounter();
-
-    // TODO: Update rates should be given by the clients
-    // themselves, as a client may want to have a higher rate!
-    // That means we need to track the last time we sent an
-    // update to each client.
     int cl_updaterate = 66;
     float cl_update_time = 1.0f / float(cl_updaterate);
 

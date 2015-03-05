@@ -5,6 +5,35 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 5 (March 5. 2015)###
+Today was also more code structure work, not too exciting to look at unfortunately. I split the application into seperate server and client
+sides. So now I can run the server as one process, and connect to the
+server in a different process.
+
+It's not complete yet though. The server doesn't actually update the
+game, nor does it send updates. The client is still missing alot of
+functionality as well.
+
+What I'd like is to have a ``StepWorld(inputs)`` function, which can
+be the same for both the server and the client. That way, I can do
+updates on the server as well as on the client, which will be useful
+for stuff like interpolating between client-side prediction and server
+updates.
+
+I might be seperating the client and the server a bit too hard though.
+Now that I think about it, I don't actually want a server, I just want
+a dedicated client which is authorative when it comes to world state.
+Hmm, I'll need to sleep on that.
+
+This post hasn't been much useful, so I'll just mention some of
+my (technical) inspirations for this project:
+
+* The much cited Valve article on [Multiplayer in the Source engine](https://developer.valvesoftware.com/wiki/Source_Multiplayer_Networking)
+
+* The not-so-much cited related articles on [Prediction](https://developer.valvesoftware.com/wiki/Prediction), [Interpolation](https://developer.valvesoftware.com/wiki/Interpolation) and [Latency compensation](https://developer.valvesoftware.com/wiki/Latency_Compensating_Methods_in_Client/Server_In-game_Protocol_Design_and_Optimization)
+
+* fogleman's [Craft](https://github.com/fogleman/Craft), a Minecraft clone written beautifully in C. It uses TCP for network communication (I use UDP for max throughput!!), but it's still interesting structure-wise.
+
 ###Day 4 (March 4. 2015)###
 
 The hard problems are starting now. After thinking for a bit, I realized
