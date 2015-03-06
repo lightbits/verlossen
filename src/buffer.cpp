@@ -1,6 +1,6 @@
 #include "buffer.h"
 
-void *Push(uint32 size)
+void *RingBuffer::Push(uint32 size)
 {
     if (write_index == -1)
         return 0;
@@ -13,7 +13,7 @@ void *Push(uint32 size)
     return result;
 }
 
-void *Pop(uint32 size)
+void *RingBuffer::Pop(uint32 size)
 {
     if (read_index == -1)
         return 0;

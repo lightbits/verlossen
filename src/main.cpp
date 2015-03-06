@@ -5,7 +5,7 @@
 #include "server.cpp"
 #include "matrix.cpp"
 #include "game.cpp"
-#include "win32_net.cpp"
+#include "net.cpp"
 
 float GetElapsedTime(uint64 begin, uint64 end)
 {
@@ -17,7 +17,7 @@ int
 main(int argc, char *argv[])
 {
     // TODO: Take in server ip and listen port and stuff
-    // if (argc == 3)
+    // if (argc == 3)<
     // {
     //     sscanf(argv[1], "%d", &preferred_listen_port);
 
@@ -37,12 +37,14 @@ main(int argc, char *argv[])
     bool is_server = false;
     if (argc == 2)
     {
-        Server(12345);
+        int tick_rate = 66;
+        Server(12345, tick_rate);
     }
     else
     {
+        int updaterate = 66;
         NetAddress server_addr = {127, 0, 0, 1, 12345};
-        Client(server_addr, 54321);
+        Client(server_addr, 54321, updaterate);
     }
 
     return 0;

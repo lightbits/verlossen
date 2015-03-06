@@ -1,6 +1,6 @@
 #ifndef _game_h_
 #define _game_h_
-#define MaxPlayerCount 2
+#include "config.h"
 #include "matrix.h"
 #include "platform.h"
 
@@ -20,7 +20,6 @@ struct GameTexture
 #define MaxSpriteFrameCount 16
 struct GameSprite
 {
-    GameTexture texture;
     int current_frame;
     int current_animation;
     float frame_delay; // Milliseconds each frame should last
@@ -56,14 +55,13 @@ struct GamePlayer
     float jump_duration;
     float jump_acceleration;
     PlayerState state;
-
     GameSprite sprite;
 };
 
 struct GameState
 {
-    GamePlayer players[MaxPlayerCount];
-    int next_player_index;
+    GamePlayer players[MAX_PLAYERS];
+    int player_count;
 
     float tile_side_in_meters;
     float tile_side_in_pixels;
@@ -117,17 +115,20 @@ struct GameMemory
 
     // Debug functions
     load_texture *LoadTexture;
-    int next_player_index;
 };
+
+void
+GameLoadTextures(GameMemory &memory);
 
 void
 GameInit(GameMemory &memory);
 
 void
+GamePushPlayer(GameMemory &memory);
+
+void
 GameUpdate(GameMemory &memory,
            GameInput *inputs,
-           int *input_map_player,
-           int input_count,
            float dt);
 
 void

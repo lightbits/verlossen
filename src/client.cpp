@@ -83,7 +83,7 @@ PlatformBlit(GameTexture texture,
                          &src, &dst, 0.0, 0, SDL_FLIP_HORIZONTAL);
 }
 
-void
+static void
 HandleUserInput(GameInput &input)
 {
     SDL_Event event;
@@ -113,7 +113,7 @@ HandleUserInput(GameInput &input)
     }
 }
 
-void
+static void
 RenderConnectionScreen(GameRenderer &render, float elapsed_time)
 {
     float speed = 8.0f;
@@ -136,20 +136,21 @@ RenderConnectionScreen(GameRenderer &render, float elapsed_time)
     }
 }
 
-void
-HandleAcceptedConnection(GameMemory &memory, ServerPacket &packet)
+static void
+Accepted(GameMemory &memory, ServerPacket &packet)
 {
-    printf("Connected to server\nHail:%s\n", packet.data);
+    printf("Connected to server\n");
 }
 
-void
-HandleServerUpdate(GameMemory &memory, ServerPacket &packet)
+static void
+Update(GameMemory &memory, ServerPacket &packet)
 {
+    memory.state = packet.state;
     printf("Received update.\n");
 }
 
-void
-Client(NetAddress server_addr, int listen_port)
+static void
+Client(NetAddress server_addr, int listen_port, int updaterate)
 {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
         return;
@@ -182,22 +183,18 @@ Client(NetAddress server_addr, int listen_port)
     GameMemory memory = {};
     memory.LoadTexture = PlatformLoadTexture;
     GameInit(memory);
+    GameLoadTextures(memory);
     GameInput input = {};
 
     NetSetPreferredListenPort(listen_port);
 
-    ClientPacket request = {};
-    request.protocol = CL_CONNECT;
-    sprintf(request.data, "I am here!");
-
     float  target_frame_time = 1.0f / 60.0f;
-    uint64 initial_tick   = SDL_GetPerformanceCounter();
-    uint64 last_cl_update = initial_tick;
-    uint64 last_conn_try  = initial_tick;
-    uint64 frame_begin    = initial_tick;
-    float  frame_time     = target_frame_time;
-    float  elapsed_time   = 0.0f;
-    float  conn_try_time  = 1.0f;
+    uint64 initial_tick = SDL_GetPerformanceCounter();
+    uint64 last_update  = initial_tick;
+    uint64 frame_begin  = initial_tick;
+    float  frame_time   = target_frame_time;
+    float  elapsed_time = 0.0f;
+    float  update_time  = 1.0f / float(updaterate);
 
     // Try to connect!
     bool connected = false;
@@ -207,34 +204,54 @@ Client(NetAddress server_addr, int listen_port)
         HandleUserInput(input);
 
         uint64 tick = SDL_GetPerformanceCounter();
-        float time_since_last_try = GetElapsedTime(last_conn_try, tick);
-        if (time_since_last_try >= conn_try_time && !connected)
+        if (GetElapsedTime(last_update, tick) >= update_time)
         {
-            printf("Attempting to connect\n");
-            NetSend(&server_addr, (const char*)&request, sizeof(ClientPacket));
-            last_conn_try = tick;
+            ClientPacket p = {};
+            p.rate = updaterate;
+            if (!connected)
+            {
+                printf("Attempting to connect\n");
+                p.protocol = CL_CONNECT;
+            }
+            else
+            {
+                p.protocol = CL_UPDATE;
+                p.input = input;
+            }
+            NetSend(&server_addr, (const char*)&p, sizeof(p));
+            last_update = tick;
         }
 
         NetAddress sender = {};
-        char buffer[sizeof(ServerPacket)];
-        int read_bytes = NetRead(buffer, sizeof(ServerPacket), &sender);
+        ServerPacket p = {};
+        int read_bytes = NetRead((char*)&p, sizeof(p), &sender);
         if (read_bytes > 0)
         {
-            ServerPacket packet = *(ServerPacket*)buffer;
-            switch (packet.protocol)
+            switch (p.protocol)
             {
                 case SV_ACCEPT:
-                    HandleAcceptedConnection(memory, packet);
+                    Accepted(memory, p);
                     connected = true;
                     break;
 
+                case SV_REJECT:
+                    printf("Was rejected by server.\n");
+                    break;
+
                 case SV_UPDATE:
-                    HandleServerUpdate(memory, packet);
+                    Update(memory, p);
                     break;
             }
         }
 
-        RenderConnectionScreen(renderer, elapsed_time);
+        if (connected)
+        {
+            GameRender(memory, renderer);
+        }
+        else
+        {
+            RenderConnectionScreen(renderer, elapsed_time);
+        }
         SDL_RenderPresent(app.renderer);
 
         uint64 frame_end = SDL_GetPerformanceCounter();

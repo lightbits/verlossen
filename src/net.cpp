@@ -7,6 +7,12 @@ static bool   g_initialized = 0;
 static uint16 g_preferred_port = 0;
 static uint16 g_default_port = 27050;
 
+bool NetAddrCmp(NetAddress *a, NetAddress *b)
+{
+    return a->ip_bytes == b->ip_bytes &&
+           a->port == b->port;
+}
+
 void NetSetPreferredListenPort(uint16 port)
 {
     g_preferred_port = port;
@@ -48,7 +54,7 @@ bool NetInitialize()
         printf("Failed to bind socket\n");
         return false;
     }
-    
+
     // Set port to not block when calling recvfrom
     DWORD non_blocking = 1;
     if (ioctlsocket(g_socket, FIONBIO, &non_blocking) != 0)
@@ -77,13 +83,13 @@ int NetSend(NetAddress *destination, const char *data, uint32 data_length)
     sockaddr_in address;
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(
-        (destination->ip0 << 24) | 
-        (destination->ip1 << 16) | 
-        (destination->ip2 <<  8) | 
+        (destination->ip0 << 24) |
+        (destination->ip1 << 16) |
+        (destination->ip2 <<  8) |
         (destination->ip3));
     address.sin_port = htons(destination->port);
 
-    int sent_bytes = sendto(g_socket, data, data_length, 
+    int sent_bytes = sendto(g_socket, data, data_length,
         0, (sockaddr*)&address, sizeof(sockaddr_in));
     return sent_bytes;
 }

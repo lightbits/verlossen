@@ -3,21 +3,21 @@
 #define assert(expression) if(!(expression)) {*(int *)0 = 0;}
 
 void
-DrawSprite(GameRenderer &render, GameSprite &sprite, int dst_x, int dst_y)
+DrawSprite(GameRenderer &render, GameTexture &texture, GameSprite &sprite, int dst_x, int dst_y)
 {
     int framekey = sprite.current_frame +
-                 sprite.current_animation * sprite.frame_count;
+                   sprite.current_animation * sprite.frame_count;
     int src_x = sprite.src_x[framekey];
     int src_y = sprite.src_y[framekey];
     BlitFlip flip = sprite.flipped ? BlitFlipHorizontal : BlitFlipNone;
-    render.Blit(sprite.texture,
+    render.Blit(texture,
         src_x, src_y, sprite.src_w, sprite.src_h,
         dst_x, dst_y, sprite.src_w, sprite.src_h,
         flip);
 }
 
 void
-DrawSprite(GameRenderer &render, GameTexture texture, int x, int y)
+DrawTexture(GameRenderer &render, GameTexture texture, int x, int y)
 {
     render.Blit(texture,
         0, 0, texture.width, texture.height,
@@ -36,13 +36,12 @@ DrawDebugRectangle(GameRenderer &render, int x, int y, int w, int h)
 }
 
 GameSprite
-make_sprite(GameTexture texture, float frame_delay,
+make_sprite(float frame_delay,
            int frame_count, int anim_count,
            int *src_x,      int *src_y,
            int src_w,       int src_h)
 {
     GameSprite result = {};
-    result.texture = texture;
     result.current_frame = 0;
     result.frame_delay = frame_delay;
     result.frame_timer = frame_delay;
@@ -59,9 +58,9 @@ make_sprite(GameTexture texture, float frame_delay,
 }
 
 void
-PushPlayer(GameMemory &memory)
+GamePushPlayer(GameMemory &memory)
 {
-    assert(memory.state.next_player_index < MaxPlayerCount);
+    assert(memory.state.player_count + 1 < MAX_PLAYERS);
     GamePlayer player = {};
     player.position = Vec2(2.0f, 2.0f);
     player.velocity = Vec2(0.0f, 0.0f);
@@ -71,21 +70,23 @@ PushPlayer(GameMemory &memory)
     player.jump_duration = 0.05f;
     player.jump_acceleration = 100.0f;
     player.sprite = memory.assets.spr_hero;
-    memory.state.players[memory.state.next_player_index++] = player;
+    memory.state.players[memory.state.player_count++] = player;
+}
+
+void
+GameLoadTextures(GameMemory &memory)
+{
+    memory.assets.tex_bgnd = memory.LoadTexture("plains.bmp");
+    memory.assets.tex_hero = memory.LoadTexture("hero_sheet.bmp");
 }
 
 void
 GameInit(GameMemory &memory)
 {
-    // Load assets
-    memory.assets.tex_bgnd = memory.LoadTexture("plains.bmp");
-    memory.assets.tex_hero = memory.LoadTexture("hero_sheet.bmp");
-
     int src_x[6] = {0, 32,  0, 32, 32, 32};
     int src_y[6] = {0,  0, 32, 32, 32, 32};
     memory.assets.spr_hero = make_sprite(
-        memory.assets.tex_hero, 0.35f, 2, 3,
-        src_x, src_y, 32, 32);
+        0.35f, 2, 3, src_x, src_y, 32, 32);
 
     // Initialize parameters
     memory.state.tile_side_in_meters = 1.00f;
@@ -268,21 +269,13 @@ UpdatePlayer(GameInput &input, GameState &state, GamePlayer &player, float dt)
 void
 GameUpdate(GameMemory &memory,
            GameInput *inputs,
-           int *input_map_player,
-           int input_count,
            float dt)
 {
-    for (int i = 0; i < input_count; i++)
+    for (int i = 0; i < memory.state.player_count; i++)
     {
-        int player_index = input_map_player[i];
-
-        if (player_index >= memory.next_player_index)
-            PushPlayer(memory);
-
-        UpdatePlayer(inputs[i],
-                     memory.state,
-                     memory.state.players[player_index],
-                     dt);
+        UpdatePlayer(
+            inputs[i], memory.state,
+            memory.state.players[i], dt);
     }
 }
 
@@ -292,9 +285,9 @@ GameRender(GameMemory &memory, GameRenderer &render)
     GameAssets *assets = &memory.assets;
     render.SetColor(PAL16_VOID);
     render.Clear();
-    DrawSprite(render, assets->tex_bgnd, 0, 0);
+    DrawTexture(render, assets->tex_bgnd, 0, 0);
 
-    for (int i = 0; i < memory.state.next_player_index; i++)
+    for (int i = 0; i < memory.state.player_count; i++)
     {
         GamePlayer *player = &memory.state.players[i];
         int x = player->position.x * memory.state.pixels_per_meter -
@@ -302,7 +295,7 @@ GameRender(GameMemory &memory, GameRenderer &render)
         int y = render.res_y -
                 player->position.y * memory.state.pixels_per_meter -
                 player->sprite.src_h;
-        DrawSprite(render, player->sprite, x, y);
+        DrawSprite(render, assets->tex_hero, player->sprite, x, y);
 
         // int px = player->position.x * memory.state.pixels_per_meter;
         // int py = render.res_y - player->position.y * memory.state.pixels_per_meter;

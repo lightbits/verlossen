@@ -8,13 +8,13 @@ struct RingBuffer
     uint32 max_data_count;
     uint8 *data;
 
-    void *PushSize(uint32 size);
-    void *PopSize(uint32 size);
+    void *Push(uint32 size);
+    void *Pop(uint32 size);
 };
 
 RingBuffer MakeRingbuffer(uint8 *buffer, uint32 max_data_count);
 
-#define PopStruct(rb, type) ((type*)rb.PopSize(sizeof(type)))
-#define PushStruct(rb, type) ((type*)rb.PushSize(sizeof(type)))
+#define RingPopStruct(rb, type) ((type*)rb.Push(sizeof(type)))
+#define RingPushStruct(rb, type) ((type*)rb.Pop(sizeof(type)))
 
 #endif
