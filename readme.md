@@ -5,6 +5,18 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 6 (March 6. 2015)###
+Alrighty. I cleaned up the code a bit, but it's still terrible. Atleast
+I have server-client gameplay communication working now. So you can join
+the game and the server adds you and simulates you and stuff.
+
+I need to look into several issues:
+
+* The server crashes upon reconnections
+* Implementing a map structure to hold clients on the server
+* Find out why there is such latency when cl_update_rate is high, even
+  running on local machine.
+
 ###Day 5 (March 5. 2015)###
 Today was also more code structure work, not too exciting to look at unfortunately. I split the application into seperate server and client
 sides. So now I can run the server as one process, and connect to the
