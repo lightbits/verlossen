@@ -36,3 +36,15 @@ Game
 * Make basic attack
 * Make second main character (a wizard, perhaps?)
 * Make enemy type
+
+Resources
+---------
+
+* https://developer.valvesoftware.com/wiki/Networking_Entities
+* https://developer.valvesoftware.com/wiki/Latency_Compensating_Methods_in_Client/Server_In-game_Protocol_Design_and_Optimization
+* https://developer.valvesoftware.com/wiki/Interpolation
+* https://developer.valvesoftware.com/wiki/Prediction
+* https://developer.valvesoftware.com/wiki/Source_Multiplayer_Networking
+* https://github.com/fogleman/Craft/tree/master/src
+* http://gafferongames.com/networking-for-game-programmers/reliability-and-flow-control/
+* http://gafferongames.com/networking-for-game-programmers/what-every-programmer-needs-to-know-about-game-networking/
