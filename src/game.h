@@ -127,6 +127,9 @@ void
 GamePushPlayer(GameMemory &memory);
 
 void
+GameRemovePlayer(GameMemory &memory, int i);
+
+void
 GameUpdate(GameMemory &memory,
            GameInput *inputs,
            float dt);

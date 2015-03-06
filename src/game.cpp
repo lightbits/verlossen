@@ -74,6 +74,17 @@ GamePushPlayer(GameMemory &memory)
 }
 
 void
+GameRemovePlayer(GameMemory &memory, int i)
+{
+    for (; i < memory.state.player_count; i++)
+    {
+        memory.state.players[i] = memory.state.players[i + 1];
+    }
+    memory.state.player_count--;
+}
+
+
+void
 GameLoadTextures(GameMemory &memory)
 {
     memory.assets.tex_bgnd = memory.LoadTexture("plains.bmp");

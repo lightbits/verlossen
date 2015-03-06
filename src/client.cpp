@@ -8,6 +8,7 @@ struct App
     const char *title;
     int window_width;
     int window_height;
+    int cl_updaterate;
     bool running;
 };
 
@@ -136,25 +137,40 @@ RenderConnectionScreen(GameRenderer &render, float elapsed_time)
     }
 }
 
-static void
-Accepted(GameMemory &memory, ServerPacket &packet)
+void
+SendConnect(NetAddress &server)
 {
-    printf("Connected to server\n");
+    ClientPacket p = {};
+    p.rate = app.cl_updaterate;
+    p.protocol = CL_CONNECT;
+    NetSend(&server, (const char*)&p, sizeof(p));
+}
+
+void
+SendUpdate(NetAddress &server, GameInput &input)
+{
+    ClientPacket p = {};
+    p.rate = app.cl_updaterate;
+    p.protocol = CL_UPDATE;
+    p.input = input;
+    NetSend(&server, (const char*)&p, sizeof(p));
+}
+
+void
+SendDisconnect(NetAddress &server)
+{
+    ClientPacket p = {};
+    p.protocol = CL_LOGOUT;
+    NetSend(&server, (const char*)&p, sizeof(p));
 }
 
 static void
-Update(GameMemory &memory, ServerPacket &packet)
-{
-    memory.state = packet.state;
-    printf("Received update.\n");
-}
-
-static void
-Client(NetAddress server_addr, int listen_port, int updaterate)
+Client(NetAddress server, int listen_port, int updaterate)
 {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
         return;
 
+    app.cl_updaterate = updaterate;
     app.window_width = 640;
     app.window_height = 320;
     app.title = "Verlossen";
@@ -206,19 +222,15 @@ Client(NetAddress server_addr, int listen_port, int updaterate)
         uint64 tick = SDL_GetPerformanceCounter();
         if (GetElapsedTime(last_update, tick) >= update_time)
         {
-            ClientPacket p = {};
-            p.rate = updaterate;
             if (!connected)
             {
+                SendConnect(server);
                 printf("Attempting to connect\n");
-                p.protocol = CL_CONNECT;
             }
             else
             {
-                p.protocol = CL_UPDATE;
-                p.input = input;
+                SendUpdate(server, input);
             }
-            NetSend(&server_addr, (const char*)&p, sizeof(p));
             last_update = tick;
         }
 
@@ -230,16 +242,16 @@ Client(NetAddress server_addr, int listen_port, int updaterate)
             switch (p.protocol)
             {
                 case SV_ACCEPT:
-                    Accepted(memory, p);
+                    printf("Joined the game\n");
                     connected = true;
                     break;
 
                 case SV_REJECT:
-                    printf("Was rejected by server.\n");
+                    printf("Game was full\n");
                     break;
 
                 case SV_UPDATE:
-                    Update(memory, p);
+                    memory.state = p.state;
                     break;
             }
         }
@@ -259,4 +271,7 @@ Client(NetAddress server_addr, int listen_port, int updaterate)
         frame_time = GetElapsedTime(frame_begin, frame_end);
         frame_begin = frame_end;
     }
+
+    SendDisconnect(server);
+    SDL_Delay(500);
 }

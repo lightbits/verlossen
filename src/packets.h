@@ -7,6 +7,7 @@
 #define SV_ACCEPT  0xABAD1DEA
 #define SV_UPDATE  0xFABFABFA
 #define SV_REJECT  0xBADBADBA
+#define CL_LOGOUT  0xAAAABBBB
 
 struct ClientPacket
 {
