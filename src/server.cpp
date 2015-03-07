@@ -86,36 +86,32 @@ Disconnect(
 }
 
 void
-Tick(float dt)
+Writef32(char **b, float *v)
 {
-    const uint32 sz = sizeof(ClientPacket);
-    NetAddress snd = {};
-    char buf[sz];
-    int read = NetRead(buf, sz, &snd);
-    while (read > 0)
-    {
-        ClientPacket p = *(ClientPacket*)buf;
-        switch (p.protocol)
-        {
-            case CL_CONNECT:
-                Accept(p, snd);
-                break;
-            case CL_UPDATE:
-                Update(p, snd);
-                break;
-            case CL_LOGOUT:
-                Disconnect(p, snd);
-                break;
-        }
-        read = NetRead(buf, sz, &snd);
-    }
+    *(float*)(*b) = *v;
+    *b += sizeof(float);
+}
 
-    GameUpdate(memory, clients_input, dt);
+void
+Readf32(char **b, float *v)
+{
+    *v = *(float*)(*b);
+    *b += sizeof(float);
 }
 
 void
 Server(int listen_port, int sv_tickrate)
 {
+    char buf[32];
+    char *b = buf;
+    float x = 3.1415926f;
+    Writef32(&b, &x);
+
+    float v;
+    b = buf;
+    Readf32(&b, &v);
+    printf("%f\n", v);
+
     NetSetPreferredListenPort(listen_port);
     printf("Listening on port %d\n", listen_port);
 
@@ -127,12 +123,37 @@ Server(int listen_port, int sv_tickrate)
 
     while (1)
     {
+        // Burn through all inputs
+        // TODO: This means that only the latest user input
+        // is stored, should we do something else instead?
+        const uint32 sz = sizeof(ClientPacket);
+        NetAddress snd = {};
+        char buf[sz];
+        int read = NetRead(buf, sz, &snd);
+        while (read > 0)
+        {
+            ClientPacket p = *(ClientPacket*)buf;
+            switch (p.protocol)
+            {
+                case CL_CONNECT:
+                    Accept(p, snd);
+                    break;
+                case CL_UPDATE:
+                    Update(p, snd);
+                    break;
+                case CL_LOGOUT:
+                    Disconnect(p, snd);
+                    break;
+            }
+            read = NetRead(buf, sz, &snd);
+        }
+
         uint64 tick = SDL_GetPerformanceCounter();
         float elapsed = GetElapsedTime(last_sv_tick, tick);
         float tick_time = 1.0f / float(sv_tickrate);
         if (elapsed > tick_time)
         {
-            Tick(tick_time);
+            GameUpdate(memory, clients_input, tick_time);
             tick = SDL_GetPerformanceCounter();
             last_sv_tick = tick;
         }

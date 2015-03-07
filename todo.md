@@ -48,3 +48,6 @@ Resources
 * https://github.com/fogleman/Craft/tree/master/src
 * http://gafferongames.com/networking-for-game-programmers/reliability-and-flow-control/
 * http://gafferongames.com/networking-for-game-programmers/what-every-programmer-needs-to-know-about-game-networking/
+
+* http://www.gdcvault.com/play/1014345/I-Shot-You-First-Networking
+* http://fabiensanglard.net/quake3/network.php

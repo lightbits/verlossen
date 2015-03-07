@@ -42,7 +42,7 @@ main(int argc, char *argv[])
     }
     else
     {
-        int updaterate = 45;
+        int updaterate = 66;
         NetAddress server_addr = {127, 0, 0, 1, 12345};
         Client(server_addr, 54321, updaterate);
     }
