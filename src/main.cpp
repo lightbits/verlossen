@@ -1,16 +1,33 @@
 #include <stdio.h>
-#include "server.h"
-#include "client.h"
-#include "client.cpp"
-#include "server.cpp"
-#include "matrix.cpp"
-#include "game.cpp"
+#include "client_test.cpp"
+#include "server_test.cpp"
 #include "net.cpp"
+// #include "server.h"
+// #include "client.h"
+// #include "client.cpp"
+// #include "server.cpp"
+// #include "matrix.cpp"
+// #include "game.cpp"
+// #include "net.cpp"
 
-float GetElapsedTime(uint64 begin, uint64 end)
+uint64
+GetTick()
+{
+    return SDL_GetPerformanceCounter();
+}
+
+float
+GetElapsedTime(uint64 begin, uint64 end)
 {
     uint64 frequency = SDL_GetPerformanceFrequency();
     return (float)(end - begin) / (float)frequency;
+}
+
+float
+TimeSince(uint64 then)
+{
+    uint64 now = GetTick();
+    return GetElapsedTime(then, now);
 }
 
 int
@@ -37,14 +54,18 @@ main(int argc, char *argv[])
     bool is_server = false;
     if (argc == 2)
     {
-        int tick_rate = 66;
-        Server(12345, tick_rate);
+        NetSetPreferredListenPort(12345);
+        Server();
+        // int tick_rate = 66;
+        // Server(12345, tick_rate);
     }
     else
     {
-        int updaterate = 66;
-        NetAddress server_addr = {127, 0, 0, 1, 12345};
-        Client(server_addr, 54321, updaterate);
+        NetSetPreferredListenPort(54321);
+        NetAddress server = {127, 0, 0, 1, 12345};
+        Client(server);
+        // int updaterate = 66;
+        // Client(server_addr, 54321, updaterate);
     }
 
     return 0;

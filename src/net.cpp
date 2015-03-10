@@ -7,12 +7,6 @@ static bool   g_initialized = 0;
 static uint16 g_preferred_port = 0;
 static uint16 g_default_port = 27050;
 
-bool NetAddrCmp(NetAddress *a, NetAddress *b)
-{
-    return a->ip_bytes == b->ip_bytes &&
-           a->port == b->port;
-}
-
 void NetSetPreferredListenPort(uint16 port)
 {
     g_preferred_port = port;
@@ -116,10 +110,13 @@ int NetRead(char *data, uint32 max_packet_size, NetAddress *sender)
         return 0;
 
     uint32 from_address = ntohl(from.sin_addr.s_addr);
-    sender->ip0 = (from_address >> 24) & 0xff;
-    sender->ip1 = (from_address >> 16) & 0xff;
-    sender->ip2 = (from_address >>  8) & 0xff;
-    sender->ip3 = (from_address >>  0) & 0xff;
-    sender->port = ntohs(from.sin_port);
+    if (sender)
+    {
+        sender->ip0 = (from_address >> 24) & 0xff;
+        sender->ip1 = (from_address >> 16) & 0xff;
+        sender->ip2 = (from_address >>  8) & 0xff;
+        sender->ip3 = (from_address >>  0) & 0xff;
+        sender->port = ntohs(from.sin_port);
+    }
     return bytes_read;
 }

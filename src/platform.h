@@ -10,6 +10,8 @@ typedef int32_t     int32;
 typedef int16_t     int16;
 typedef int8_t      int8;
 
+uint64 GetTick();
 float GetElapsedTime(uint64 begin, uint64 end);
+float TimeSince(uint64 then);
 
 #endif
