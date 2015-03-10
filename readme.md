@@ -5,6 +5,21 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 7 (March 10. 2015)###
+I think I caught a cold before the weekend, so the last 4 days have been somewhat of a productivity slump. But I rewrote the server-client code.
+And this time I'm kind of happy with how it's layed out. I generally think
+it's a bad idea to fuss about this sort of stuff early on, since most up-front
+designs tend to get the small details wrong. And if you want a beautiful
+program, you need to get those right.
+
+Here's some pixels.
+
+![](./data/gang.png)
+
+* Source files: Too many
+* Player count: 0 (dang)
+* Compile time: 2.9s
+
 ###Day 6 (March 6. 2015)###
 Alrighty. I cleaned up the code a bit, but it's still terrible. Atleast
 I have server-client gameplay communication working now. So you can join
