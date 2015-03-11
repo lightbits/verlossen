@@ -20,4 +20,12 @@ int  NetSend(NetAddress *destination, const char *data, uint32 data_length);
 int  NetRead(char *data, uint32 max_packet_size, NetAddress *sender);
 void NetClose();
 
+// Debugging tools
+struct NetStats
+{
+    float avg_bytes_sent;
+    float avg_bytes_read;
+};
+NetStats NetGetStats();
+
 #endif

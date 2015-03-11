@@ -59,7 +59,6 @@ struct ClientList
 struct App
 {
     bool running;
-    uint64 initial_tick;
     ClientList clients;
 };
 
@@ -100,7 +99,6 @@ PollNetwork()
     int read_bytes = NetRead(buffer, max_size, &sender);
     while (read_bytes > 0)
     {
-        printf("Read %d bytes: %x\n", read_bytes, incoming.protocol);
         switch (incoming.protocol)
         {
         case CL_CONNECT:
@@ -137,10 +135,11 @@ main(int argc, char **argv)
     uint64 initial_tick = GetTick();
     uint64 last_update_sent = initial_tick;
     uint64 last_game_tick = initial_tick;
-    int tickrate = 66;
-    int updaterate = 2;
+    int tickrate = 20;
+    int updaterate = 20;
     float tick_interval = 1.0f / float(tickrate);
     float update_interval = 1.0f / float(updaterate);
+    int updates_sent = 0;
     while (1)
     {
         uint64 tick = GetTick();
@@ -156,9 +155,16 @@ main(int argc, char **argv)
         {
             for (int i = 0; i < app.clients.count; i++)
             {
+                updates_sent++;
                 SendUpdate(state, app.clients.addresses[i]);
             }
             last_update_sent = tick;
         }
+
+        NetStats stats = NetGetStats();
+        printf("\rx = %d y = %d avg: %.2fKBps out, %.2fKBps in)",
+                state.x, state.y,
+                stats.avg_bytes_sent / 1024,
+                stats.avg_bytes_read / 1024);
     }
 }

@@ -13,8 +13,8 @@ GameTick(GameState &state, GameInput *inputs, int input_count)
     for (int i = 0; i < input_count; i++)
     {
         if (inputs[i].action1.is_down)
-            state.x = 5;
+            state.x++;
         else if (inputs[i].action2.is_down)
-            state.y = 10;
+            state.y++;
     }
 }

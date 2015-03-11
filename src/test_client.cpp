@@ -14,7 +14,6 @@ struct App
     const char *title;
     bool running;
     bool connected;
-    uint64 initial_tick;
     NetAddress server;
 };
 
@@ -106,14 +105,17 @@ main(int argc, char **argv)
     GameState state = {};
     InitGameState(state);
 
-    app.initial_tick = SDL_GetPerformanceCounter();
+
     app.running = true;
     app.connected = false;
     app.server = server;
-    uint64 last_connection_attempt = app.initial_tick;
-    uint64 last_update_sent = app.initial_tick;
+    int updaterate = 20;
+    int updates_sent = 0;
+    uint64 initial_tick = SDL_GetPerformanceCounter();
+    uint64 last_connection_attempt = initial_tick;
+    uint64 last_update_sent = initial_tick;
     float connection_attempt_interval = 1.0f;
-    float send_update_interval = 1.0f;
+    float send_update_interval = 1.0f / float(updaterate);
     while (app.running)
     {
         uint64 frame_tick = SDL_GetPerformanceCounter();
@@ -151,11 +153,16 @@ main(int argc, char **argv)
             TimeSince(last_update_sent) >
             send_update_interval)
         {
+            updates_sent++;
             SendInput(input);
             last_update_sent = frame_tick;
         }
 
-        printf("\rx = %d y = %d", state.x, state.y);
+        NetStats stats = NetGetStats();
+        printf("\rx = %d y = %d avg: %.2fKBps out, %.2fKBps in)",
+                state.x, state.y,
+                stats.avg_bytes_sent / 1024,
+                stats.avg_bytes_read / 1024);
 
         SDL_RenderPresent(app.renderer);
     }

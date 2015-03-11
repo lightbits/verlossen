@@ -7,6 +7,13 @@ static bool   g_initialized = 0;
 static uint16 g_preferred_port = 0;
 static uint16 g_default_port = 27050;
 
+// Debug statistics
+static NetStats g_stats;
+static uint64   g_last_stats_update;
+static float    g_stats_update_period = 0.5f;
+static int      g_bytes_sent;
+static int      g_bytes_read;
+
 void NetSetPreferredListenPort(uint16 port)
 {
     g_preferred_port = port;
@@ -83,9 +90,10 @@ int NetSend(NetAddress *destination, const char *data, uint32 data_length)
         (destination->ip3));
     address.sin_port = htons(destination->port);
 
-    int sent_bytes = sendto(g_socket, data, data_length,
+    int bytes_sent = sendto(g_socket, data, data_length,
         0, (sockaddr*)&address, sizeof(sockaddr_in));
-    return sent_bytes;
+    g_bytes_sent += bytes_sent;
+    return bytes_sent;
 }
 
 int NetRead(char *data, uint32 max_packet_size, NetAddress *sender)
@@ -108,6 +116,7 @@ int NetRead(char *data, uint32 max_packet_size, NetAddress *sender)
         g_socket, data, max_packet_size, 0, (sockaddr*)&from, &from_length);
     if (bytes_read <= 0)
         return 0;
+    g_bytes_read += bytes_read;
 
     uint32 from_address = ntohl(from.sin_addr.s_addr);
     if (sender)
@@ -119,4 +128,24 @@ int NetRead(char *data, uint32 max_packet_size, NetAddress *sender)
         sender->port = ntohs(from.sin_port);
     }
     return bytes_read;
+}
+
+NetStats NetGetStats()
+{
+    if (g_last_stats_update == 0)
+    {
+        g_last_stats_update = GetTick() - 1;
+    }
+
+    if (TimeSince(g_last_stats_update) >
+        g_stats_update_period)
+    {
+        g_stats.avg_bytes_sent = g_bytes_sent / g_stats_update_period;
+        g_stats.avg_bytes_read = g_bytes_read / g_stats_update_period;
+        g_last_stats_update = GetTick();
+        g_bytes_sent = 0;
+        g_bytes_read = 0;
+    }
+
+    return g_stats;
 }
