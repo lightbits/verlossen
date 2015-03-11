@@ -5,6 +5,31 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 8 (March 11. 2015)###
+Got some simple network statistics logging going on. I now keep track of
+the average number of bytes sent and received. The averages are recomputed
+every once in a while, so that I can actually read the numbers. I like to keep debug interfaces as minimal as possible so that they don't obfuscate the true
+functionality of your code. This is how it looks:
+
+    int main() {
+        ...
+        NetStats stats = NetGetStats();
+        printf("%.2f KBps out\n", stats.avg_bytes_sent / 1024);
+        printf("%.2f KBps in\n", stats.avg_bytes_read / 1024);
+        ...
+    }
+
+All initialization and keeping track of last time the average was computed
+is kept inside the networking module. I'd like to be able to measure round-trip-time for packets as well, but that would probably require some acknowledgment scheme, which I currently don't have.
+
+[Quake 3](http://fabiensanglard.net/quake3/network.php) does this to some extent. It's not full-on reliability like TCP, since that would be silly, but more like the server goes "Hey, I just sent you snapshot number 591823, it would be cool if you could acknowledge that."
+
+But the snapshot might get lost or corrupted towards the client, and the
+acknowledgment might get lost or corrupted on its way back to the server. If the server does get an ack, it knows that the player has got snapshots atleast since that number. Using that it can do a diff before sending new snapshots to reduce the amount of data being sent.
+
+Pretty neat!
+
+
 ###Day 7 (March 10. 2015)###
 I think I caught a cold before the weekend, so the last 4 days have been somewhat of a productivity slump. But I rewrote the server-client code.
 And this time I'm kind of happy with how it's layed out. I generally think
