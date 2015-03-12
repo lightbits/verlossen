@@ -14,6 +14,8 @@ struct App
     const char *title;
     bool running;
     bool connected;
+    int cmd_rate;
+    int rate;
     NetAddress server;
 };
 
@@ -80,6 +82,7 @@ SendInput(GameInput &input)
     ClientPacket p = {};
     p.protocol = CL_UPDATE;
     p.input = input;
+    p.rate = app.rate;
     NetSend(&app.server, (const char *)&p, sizeof(ClientPacket));
 }
 
@@ -88,20 +91,29 @@ SendConnect()
 {
     ClientPacket p = {};
     p.protocol = CL_CONNECT;
+    p.rate = app.rate;
     NetSend(&app.server, (const char*)&p, sizeof(ClientPacket));
 }
 
 int
 main(int argc, char **argv)
 {
+    // TODO: Load config in a better way
     int listen_port = 54321;
-    if (argc == 2)
+    app.cmd_rate = 20;
+    app.rate = 20;
+    if (argc >= 2)
     {
         sscanf(argv[1], "%d", &listen_port);
     }
-
-    // TODO: Take from argv
+    if (argc == 4)
+    {
+        sscanf(argv[2], "%d", &app.cmd_rate);
+        sscanf(argv[3], "%d", &app.rate);
+    }
     NetSetPreferredListenPort(listen_port);
+
+    // TODO: Let user set this in a screen?
     NetAddress server = {127, 0, 0, 1, 12345};
 
     if (!CreateContext())
@@ -114,7 +126,6 @@ main(int argc, char **argv)
     app.running = true;
     app.connected = false;
     app.server = server;
-    int updaterate = 20;
     int updates_sent = 0;
     uint64 initial_tick = SDL_GetPerformanceCounter();
     uint64 last_connection_attempt = initial_tick;
@@ -122,7 +133,7 @@ main(int argc, char **argv)
     uint64 last_update_recv = initial_tick;
     float server_timeout_interval = 2.0f;
     float connection_attempt_interval = 1.0f;
-    float send_update_interval = 1.0f / float(updaterate);
+    float send_update_interval = 1.0f / float(app.cmd_rate);
     while (app.running)
     {
         uint64 frame_tick = SDL_GetPerformanceCounter();

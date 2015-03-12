@@ -19,9 +19,6 @@ struct ClientList
     Client entries[MAX_CONNECTIONS];
     int count;
 
-    // This will invalidate all outstanding pointers
-    // Might not be a good idea :(
-    // Returns the index of the next client in the list
     int
     Remove(Client *client)
     {
@@ -150,21 +147,22 @@ PollNetwork()
 int
 main(int argc, char **argv)
 {
-    // TODO: Take from argv
-    NetSetPreferredListenPort(12345);
+    int listen_port = 12345;
+    if (argc == 2)
+    {
+        sscanf(argv[1], "%d", &listen_port);
+    }
+    NetSetPreferredListenPort(listen_port);
 
     GameState state = {};
     InitGameState(state);
 
     uint64 initial_tick = GetTick();
-    uint64 last_update_sent = initial_tick;
     uint64 last_game_tick = initial_tick;
     int tickrate = 66;
-    int updaterate = 20;
-    float tick_interval = 1.0f / float(tickrate);
-    float update_interval = 1.0f / float(updaterate);
-    float client_timeout_interval = 2.0f;
     int updates_sent = 0;
+    float tick_interval = 1.0f / float(tickrate);
+    float client_timeout_interval = 2.0f;
     while (1)
     {
         uint64 tick = GetTick();
@@ -179,26 +177,18 @@ main(int argc, char **argv)
             last_game_tick = tick;
         }
 
-        // for (int i = 0; i < app.clients.count; i++)
-        // {
-        //     Client *c = &app.clients.entries[i]
-        //     int rate = c->rate;
-        // }
-
-        if (TimeSince(last_update_sent) > update_interval)
-        {
-            for (int i = 0; i < app.clients.count; i++)
-            {
-                updates_sent++;
-                app.clients.entries[i].last_send_time = GetTick();
-                SendUpdate(state, app.clients.entries[i].address);
-            }
-            last_update_sent = tick;
-        }
-
         for (int i = 0; i < app.clients.count; i++)
         {
             Client *c = &app.clients.entries[i];
+            int rate = c->rate == 0 ? 20 : c->rate;
+            if (TimeSince(c->last_send_time) >
+                1.0f / float(rate))
+            {
+                updates_sent++;
+                c->last_send_time = GetTick();
+                SendUpdate(state, app.clients.entries[i].address);
+            }
+
             if (TimeSince(c->last_recv_time) >
                 client_timeout_interval)
             {

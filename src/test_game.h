@@ -38,6 +38,7 @@ struct ClientPacket
 {
     uint32 protocol;
     GameInput input;
+    int rate;
 };
 
 void InitGameState(GameState &state);
