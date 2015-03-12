@@ -93,6 +93,9 @@ SendReject(NetAddress &to)
 void
 SendUpdate(GameState &state, NetAddress &to)
 {
+    /* TODO: Don't send the entire state
+    */
+
     ServerPacket p = {};
     p.protocol = SV_UPDATE;
     p.state = state;

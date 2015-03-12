@@ -5,6 +5,68 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 9 (March 12. 2015)###
+Progress! Current feature set of the networking module is now
+
+* Clients can connect and disconnect
+* Clients will detect timeouts from server and attempt to reconnect
+* The server will detect timeouts from clients and remove them
+* Clients can specify a desired ``cmdrate`` and ``rate``
+
+The last point might need elaboration. I'm following Valve's naming
+convention here, since I'm used to it from fiddling with the console
+in Team Fortress 2. So ``cmdrate`` denotes how many times per second
+the client should send an update (command) to the server. ``rate`` is
+our desired server-updates per second, and is a hint sent to the server.
+
+I'm still running this module on a very simplified version of the game,
+since I want to get the basic feature set down first. The next thing I
+want to implement is some form of local prediction and interpolation.
+So right now the client looks somewhat like this:
+
+    client loop:
+        if time since last cmd sent > 1/cmdrate:
+            send cmd
+
+        if update recv:
+            state = update.state
+
+        render game
+
+If I only update the state when we get it from the server, the game will
+look way choppy and feel really bad in terms of lag. For this reason,
+fast-paced games usually advance the game on the client as well, but
+blend the predicted state together whenever an update comes in.
+
+To illustrate in beautiful pixellated graphics, say we have received
+the state for timesteps 0 to 1, but we have a higher framerate than
+our update rate, and we are currently rendering the state at timestep 5.
+
+![](./data/prediction_1.png)
+
+To get there, we had to predict what the game would look like for
+frames 2 throughout 5, given the last server update and our input
+at those frames. Say we now get a new update from the server:
+
+![](./data/prediction_2.png)
+
+Because the server represents the **true** game state, shared with
+all clients, we need to synchronize with it. But if we reset our
+state to the incoming update, we would clearly be rendering an old
+state!
+
+![](./data/prediction_3.png)
+
+Instead, what we can do is reset our state to the incoming server
+state, and predict frames 3 through 5 again, but now with a different
+"initial state".
+
+To compute the game state for frame 3 through 5, we need the input
+we applied during frame 2 through 4. And this is where the ringbuffer
+comes in. Instead of storing all inputs since the dawn of UNIX, we
+store a handful - corresponding to how much lag we estimate we have -
+in a ringbuffer, and pop one off when we get a server update.
+
 ###Day 8 (March 11. 2015)###
 Got some simple network statistics logging going on. I now keep track of
 the average number of bytes sent and received. The averages are recomputed
