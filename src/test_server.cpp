@@ -6,36 +6,51 @@
 
 struct Client
 {
-    NetAddress *address;
-    GameInput *input;
+    NetAddress address;
+    GameInput input;
+    uint64 last_recv_time;
+    uint64 last_send_time;
+    int rate;
 };
 
 #define MAX_CONNECTIONS 4
 struct ClientList
 {
-    Client     entries[MAX_CONNECTIONS];
-    NetAddress addresses[MAX_CONNECTIONS];
-    GameInput  inputs[MAX_CONNECTIONS];
-    int        count;
-    /*
-    TODO: Keep rate and last update sent variables
-    to throttle the rate at which we send updates to
-    a specific client.
+    Client entries[MAX_CONNECTIONS];
+    int count;
 
-    TODO: Keep last update recv to determine timeouts
-    */
+    // This will invalidate all outstanding pointers
+    // Might not be a good idea :(
+    // Returns the index of the next client in the list
+    int
+    Remove(Client *client)
+    {
+        int i = 0;
+        while (i < count)
+        {
+            if (&entries[i] == client)
+                break;
+            i++;
+        }
+        if (i < count)
+        {
+            for (int j = i; j < count - 1; j++)
+                entries[j] = entries[j + 1];
+            count--;
+        }
+        return i;
+    }
 
-    bool
+    Client *
     Add(NetAddress &address)
     {
         if (count >= MAX_CONNECTIONS)
-            return false;
-        addresses[count] = address;
-        inputs[count] = GameInput();
-        entries[count].address = &addresses[count];
-        entries[count].input = &inputs[count];
+            return 0;
+        Client *result = &entries[count];
+        result->address = address;
+        result->input = GameInput();
         count++;
-        return true;
+        return result;
     }
 
     Client *
@@ -45,12 +60,10 @@ struct ClientList
         uint16 b_port = address.port;
         for (int i = 0; i < count; i++)
         {
-            uint32 a_ip = addresses[i].ip_bytes;
-            uint16 a_port = addresses[i].port;
+            uint32 a_ip = entries[i].address.ip_bytes;
+            uint16 a_port = entries[i].address.port;
             if (a_ip == b_ip && a_port == b_port)
-            {
                 return &entries[i];
-            }
         }
         return 0;
     }
@@ -102,22 +115,33 @@ PollNetwork()
         switch (incoming.protocol)
         {
         case CL_CONNECT:
-            if (app.clients.Add(sender))
+        {
+            Client *c = app.clients.Add(sender);
+            if (c)
+            {
+                c->last_recv_time = GetTick();
+                c->rate = incoming.rate;
                 SendAccept(sender);
+            }
             else
+            {
                 SendReject(sender);
-            break;
+            }
+        } break;
         case CL_UPDATE:
+        {
             Client *c = app.clients.Get(sender);
             if (c)
             {
-                *c->input = incoming.input;
+                c->input = incoming.input;
+                c->rate = incoming.rate;
+                c->last_recv_time = GetTick();
             }
             else
             {
                 printf("Received update from dropped client\n");
             }
-            break;
+        } break;
         }
         read_bytes = NetRead(buffer, max_size, &sender);
     }
@@ -135,10 +159,11 @@ main(int argc, char **argv)
     uint64 initial_tick = GetTick();
     uint64 last_update_sent = initial_tick;
     uint64 last_game_tick = initial_tick;
-    int tickrate = 20;
+    int tickrate = 66;
     int updaterate = 20;
     float tick_interval = 1.0f / float(tickrate);
     float update_interval = 1.0f / float(updaterate);
+    float client_timeout_interval = 2.0f;
     int updates_sent = 0;
     while (1)
     {
@@ -147,22 +172,46 @@ main(int argc, char **argv)
 
         if (TimeSince(last_game_tick) > tick_interval)
         {
-            GameTick(state, app.clients.inputs, app.clients.count);
+            GameInput inputs[MAX_CONNECTIONS];
+            for (int i = 0; i < app.clients.count; i++)
+                inputs[i] = app.clients.entries[i].input;
+            GameTick(state, inputs, app.clients.count);
             last_game_tick = tick;
         }
+
+        // for (int i = 0; i < app.clients.count; i++)
+        // {
+        //     Client *c = &app.clients.entries[i]
+        //     int rate = c->rate;
+        // }
 
         if (TimeSince(last_update_sent) > update_interval)
         {
             for (int i = 0; i < app.clients.count; i++)
             {
                 updates_sent++;
-                SendUpdate(state, app.clients.addresses[i]);
+                app.clients.entries[i].last_send_time = GetTick();
+                SendUpdate(state, app.clients.entries[i].address);
             }
             last_update_sent = tick;
         }
 
+        for (int i = 0; i < app.clients.count; i++)
+        {
+            Client *c = &app.clients.entries[i];
+            if (TimeSince(c->last_recv_time) >
+                client_timeout_interval)
+            {
+                printf("Client %d.%d.%d.%d timed out.\n",
+                       c->address.ip0, c->address.ip1,
+                       c->address.ip2, c->address.ip3);
+                i = app.clients.Remove(c);
+            }
+        }
+
         NetStats stats = NetGetStats();
-        printf("\rx = %d y = %d avg: %.2fKBps out, %.2fKBps in)",
+        printf("\r%d clients\tx = %d\ty = %d\tavg: %.2fKBps out, %.2fKBps in)",
+                app.clients.count,
                 state.x, state.y,
                 stats.avg_bytes_sent / 1024,
                 stats.avg_bytes_read / 1024);

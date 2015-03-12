@@ -94,8 +94,14 @@ SendConnect()
 int
 main(int argc, char **argv)
 {
+    int listen_port = 54321;
+    if (argc == 2)
+    {
+        sscanf(argv[1], "%d", &listen_port);
+    }
+
     // TODO: Take from argv
-    NetSetPreferredListenPort(54321);
+    NetSetPreferredListenPort(listen_port);
     NetAddress server = {127, 0, 0, 1, 12345};
 
     if (!CreateContext())
@@ -105,7 +111,6 @@ main(int argc, char **argv)
     GameState state = {};
     InitGameState(state);
 
-
     app.running = true;
     app.connected = false;
     app.server = server;
@@ -114,6 +119,8 @@ main(int argc, char **argv)
     uint64 initial_tick = SDL_GetPerformanceCounter();
     uint64 last_connection_attempt = initial_tick;
     uint64 last_update_sent = initial_tick;
+    uint64 last_update_recv = initial_tick;
+    float server_timeout_interval = 2.0f;
     float connection_attempt_interval = 1.0f;
     float send_update_interval = 1.0f / float(updaterate);
     while (app.running)
@@ -127,14 +134,13 @@ main(int argc, char **argv)
         int read_bytes = NetRead(buffer, max_size, NULL);
         while (read_bytes > 0)
         {
+            last_update_recv = GetTick();
             switch (update.protocol)
             {
             case SV_ACCEPT:
                 app.connected = true;
                 break;
             case SV_UPDATE:
-                // TODO: Actual synchronization
-                // TODO: Client-side and server-side specific vars
                 state = update.state;
                 break;
             }
@@ -145,6 +151,7 @@ main(int argc, char **argv)
             TimeSince(last_connection_attempt) >
             connection_attempt_interval)
         {
+            printf("Attempting to connect.\n");
             SendConnect();
             last_connection_attempt = frame_tick;
         }
@@ -156,6 +163,14 @@ main(int argc, char **argv)
             updates_sent++;
             SendInput(input);
             last_update_sent = frame_tick;
+        }
+
+        if (app.connected &&
+            TimeSince(last_update_recv) >
+            server_timeout_interval)
+        {
+            printf("Lost connection to server.\n");
+            app.connected = false;
         }
 
         NetStats stats = NetGetStats();
