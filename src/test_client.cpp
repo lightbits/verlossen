@@ -3,6 +3,7 @@
 #include "net.cpp"
 #include "platform.cpp"
 #include "test_game.cpp"
+#include "buffer.cpp"
 
 struct App
 {
@@ -105,6 +106,43 @@ SendConnect()
 }
 
 int
+LerpInt(int a, int b, float t)
+{
+    return int(a + (b - a) * t);
+}
+
+GameState
+InterpolateState(
+    GameState a,
+    GameState b,
+    float alpha)
+{
+    GameState result = {};
+    a.x = LerpInt(a.x, b.x, alpha);
+    b.y = LerpInt(a.y, b.y, alpha);
+    return result;
+}
+
+// TODO: Implement this!!
+GameState
+PredictState(
+    GameState initial_state,
+    RingBuffer local_inputs, // Deliberately a copy
+    int horizon)
+{
+    // TODO: Other player's input. assume constant over horizon?
+    GameInput inputs[4]; // TODO: Define this param?
+    // TODO: Need our "input_index" to "player index" mapping
+    GameState result = initial_state;
+    for (int i = 0; i < horizon; i++)
+    {
+        GameInput *input = RingPopStruct(local_inputs, GameInput);
+        // tick game, based on everyone elses input as well
+    }
+    return result;
+}
+
+int
 main(int argc, char **argv)
 {
     // TODO: Load config in a better way
@@ -132,6 +170,10 @@ main(int argc, char **argv)
     GameState state = {};
     InitGameState(state);
 
+    const int LERP_WINDOW = 16; // Should be estimated from RTT
+    GameInput input_buffer[LERP_WINDOW];
+    RingBuffer input_ring = MakeRingBuffer((uint8*)input_buffer, LERP_WINDOW);
+
     app.running = true;
     net.connected = false;
     int updates_sent = 0;
@@ -146,6 +188,16 @@ main(int argc, char **argv)
     {
         uint64 frame_tick = SDL_GetPerformanceCounter();
         PollInput(input);
+
+        GameInput *next = RingPushStruct(input_ring, GameInput);
+        if (!next)
+        {
+            RingPopStruct(input_ring, GameInput);
+            next = RingPushStruct(input_ring, GameInput);
+        }
+        *next = input;
+
+        printf("%d\n", input_ring.write_index);
 
         ServerPacket update = {};
         char *buffer = (char*)&update;
@@ -166,6 +218,10 @@ main(int argc, char **argv)
                     update.sequence))
                 {
                     net.expected = update.sequence + 1;
+
+                    // TODO: Sync state, simulation, prediction
+                    printf("Popping input\n");
+                    RingPopStruct(input_ring, GameInput);
                     state = update.state;
                 }
                 break;
@@ -199,11 +255,11 @@ main(int argc, char **argv)
             net.connected = false;
         }
 
-        NetStats stats = NetGetStats();
-        printf("\rx = %d y = %d", state.x, state.y);
-        printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
-        printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
-        printf("\tlast recv %d", net.expected - 1);
+        // NetStats stats = NetGetStats();
+        // printf("\rx = %d y = %d", state.x, state.y);
+        // printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
+        // printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
+        // printf("\tlast recv %d", net.expected - 1);
 
         SDL_RenderPresent(app.renderer);
     }

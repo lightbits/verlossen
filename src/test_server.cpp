@@ -163,10 +163,10 @@ void
 PrintDebugStuff(GameState state)
 {
     NetStats stats = NetGetStats();
-    printf("\nx = %d y = %d", state.x, state.y);
+    printf("x = %d y = %d", state.x, state.y);
     printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
     printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
-    printf("\tsequence %d", net.sequence);
+    printf("\tsequence %d\n", net.sequence);
 }
 
 int

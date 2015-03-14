@@ -6,7 +6,21 @@ Play with your friend across the world using state-of-the-art internet technolog
 ##Development log:##
 
 ###Day 10 (March 13. 2015)###
-Sequence numbers. Drop old, out-of-order packets!
+Alrighty, got sequence numbers and acknowledgments working. Sequence
+numbers are labels added to the snapshots sent from the server or the
+inputs sent from the client. Since UDP is super unreliable and stuff,
+it might happen that packets come in the wrong order! But with sequence
+ numbers, you can figure out if the packet you got is infact newer than
+ the one you have already.
+
+Acknowledges are also nice to have, since you can do something called
+**delta compression** to reduce bandwidth required by your game. You
+basically store a sliding window of snapshots on the server, and tag
+each client with which snapshot they last received. When it's time to
+send a new snapshot, you can compare it with the last one you know they
+got, and only send the differences!
+
+Huge savings are possible!
 
 ###Day 9 (March 12. 2015)###
 Progress! Current feature set of the networking module is now

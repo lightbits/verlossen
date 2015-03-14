@@ -27,11 +27,12 @@ void *RingBuffer::Pop(uint32 size)
 }
 
 RingBuffer
-MakeRingbuffer(uint8 *buffer, uint32 max_data_count)
+MakeRingBuffer(uint8 *buffer, uint32 max_data_count)
 {
     RingBuffer result = {};
     result.data = buffer;
     result.max_data_count = max_data_count;
     result.read_index = -1;
+    result.write_index = 0;
     return result;
 }
