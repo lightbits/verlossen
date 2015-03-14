@@ -15,6 +15,9 @@ struct NetAddress
     uint16 port; // Which port the client is listening to
 };
 
+NetAddress NetMakeAddress(uint8 ip0, uint8 ip1,
+    uint8 ip2, uint8 ip3, uint16 port);
+
 void NetSetPreferredListenPort(uint16 port);
 int  NetSend(NetAddress *destination, const char *data, uint32 data_length);
 int  NetRead(char *data, uint32 max_packet_size, NetAddress *sender);

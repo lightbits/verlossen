@@ -13,12 +13,19 @@ struct App
     int window_height;
     const char *title;
     bool running;
-    bool connected;
-    int cmd_rate;
-    int rate;
-    NetAddress server;
 };
 
+struct Network
+{
+    NetAddress server;
+    bool connected;
+    int cmd_rate;    // Updates/sec we send to server
+    int rate;        // Updates/sec we want from server
+    Sequence sequence; // Tags next update we send to server
+    Sequence expected; // Expected tag of next update from server
+};
+
+static Network net;
 static App app;
 
 void
@@ -82,8 +89,9 @@ SendInput(GameInput &input)
     ClientPacket p = {};
     p.protocol = CL_UPDATE;
     p.input = input;
-    p.rate = app.rate;
-    NetSend(&app.server, (const char *)&p, sizeof(ClientPacket));
+    p.rate = net.rate;
+    p.expected = net.expected;
+    NetSend(&net.server, (const char *)&p, sizeof(ClientPacket));
 }
 
 void
@@ -91,8 +99,9 @@ SendConnect()
 {
     ClientPacket p = {};
     p.protocol = CL_CONNECT;
-    p.rate = app.rate;
-    NetSend(&app.server, (const char*)&p, sizeof(ClientPacket));
+    p.rate = net.rate;
+    p.expected = net.expected;
+    NetSend(&net.server, (const char*)&p, sizeof(ClientPacket));
 }
 
 int
@@ -100,21 +109,21 @@ main(int argc, char **argv)
 {
     // TODO: Load config in a better way
     int listen_port = 54321;
-    app.cmd_rate = 20;
-    app.rate = 20;
+    net.cmd_rate = 20;
+    net.rate = 20;
     if (argc >= 2)
     {
         sscanf(argv[1], "%d", &listen_port);
     }
     if (argc == 4)
     {
-        sscanf(argv[2], "%d", &app.cmd_rate);
-        sscanf(argv[3], "%d", &app.rate);
+        sscanf(argv[2], "%d", &net.cmd_rate);
+        sscanf(argv[3], "%d", &net.rate);
     }
     NetSetPreferredListenPort(listen_port);
 
     // TODO: Let user set this in a screen?
-    NetAddress server = {127, 0, 0, 1, 12345};
+    net.server = NetMakeAddress(127, 0, 0, 1, 12345);
 
     if (!CreateContext())
         return false;
@@ -124,8 +133,7 @@ main(int argc, char **argv)
     InitGameState(state);
 
     app.running = true;
-    app.connected = false;
-    app.server = server;
+    net.connected = false;
     int updates_sent = 0;
     uint64 initial_tick = SDL_GetPerformanceCounter();
     uint64 last_connection_attempt = initial_tick;
@@ -133,7 +141,7 @@ main(int argc, char **argv)
     uint64 last_update_recv = initial_tick;
     float server_timeout_interval = 2.0f;
     float connection_attempt_interval = 1.0f;
-    float send_update_interval = 1.0f / float(app.cmd_rate);
+    float send_update_interval = 1.0f / float(net.cmd_rate);
     while (app.running)
     {
         uint64 frame_tick = SDL_GetPerformanceCounter();
@@ -149,16 +157,23 @@ main(int argc, char **argv)
             switch (update.protocol)
             {
             case SV_ACCEPT:
-                app.connected = true;
+                net.expected = update.sequence + 1;
+                net.connected = true;
                 break;
             case SV_UPDATE:
-                state = update.state;
+                if (IsPacketMoreRecent(
+                    net.expected,
+                    update.sequence))
+                {
+                    net.expected = update.sequence + 1;
+                    state = update.state;
+                }
                 break;
             }
             read_bytes = NetRead(buffer, max_size, NULL);
         }
 
-        if (!app.connected &&
+        if (!net.connected &&
             TimeSince(last_connection_attempt) >
             connection_attempt_interval)
         {
@@ -167,7 +182,7 @@ main(int argc, char **argv)
             last_connection_attempt = frame_tick;
         }
 
-        if (app.connected &&
+        if (net.connected &&
             TimeSince(last_update_sent) >
             send_update_interval)
         {
@@ -176,19 +191,19 @@ main(int argc, char **argv)
             last_update_sent = frame_tick;
         }
 
-        if (app.connected &&
+        if (net.connected &&
             TimeSince(last_update_recv) >
             server_timeout_interval)
         {
             printf("Lost connection to server.\n");
-            app.connected = false;
+            net.connected = false;
         }
 
         NetStats stats = NetGetStats();
-        printf("\rx = %d y = %d avg: %.2fKBps out, %.2fKBps in)",
-                state.x, state.y,
-                stats.avg_bytes_sent / 1024,
-                stats.avg_bytes_read / 1024);
+        printf("\rx = %d y = %d", state.x, state.y);
+        printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
+        printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
+        printf("\tlast recv %d", net.expected - 1);
 
         SDL_RenderPresent(app.renderer);
     }

@@ -7,10 +7,11 @@
 struct Client
 {
     NetAddress address;
-    GameInput input;
-    uint64 last_recv_time;
-    uint64 last_send_time;
-    int rate;
+    GameInput  input;
+    uint64     last_recv_time;
+    uint64     last_send_time;
+    Sequence   last_ack;
+    int        rate;
 };
 
 #define MAX_CONNECTIONS 4
@@ -69,9 +70,15 @@ struct ClientList
 struct App
 {
     bool running;
-    ClientList clients;
 };
 
+struct Network
+{
+    ClientList clients;
+    Sequence   sequence; // Tags the next snapshot we send to clients
+};
+
+static Network net;
 static App app;
 
 void
@@ -79,6 +86,7 @@ SendAccept(NetAddress &to)
 {
     ServerPacket p = {};
     p.protocol = SV_ACCEPT;
+    p.sequence = net.sequence;
     NetSend(&to, (const char*)&p, sizeof(p));
 }
 
@@ -87,6 +95,7 @@ SendReject(NetAddress &to)
 {
     ServerPacket p = {};
     p.protocol = SV_REJECT;
+    p.sequence = net.sequence;
     NetSend(&to, (const char*)&p, sizeof(p));
 }
 
@@ -99,6 +108,7 @@ SendUpdate(GameState &state, NetAddress &to)
     ServerPacket p = {};
     p.protocol = SV_UPDATE;
     p.state = state;
+    p.sequence = net.sequence;
     NetSend(&to, (const char*)&p, sizeof(p));
 }
 
@@ -116,9 +126,10 @@ PollNetwork()
         {
         case CL_CONNECT:
         {
-            Client *c = app.clients.Add(sender);
+            Client *c = net.clients.Add(sender);
             if (c)
             {
+                c->last_ack = incoming.expected - 1;
                 c->last_recv_time = GetTick();
                 c->rate = incoming.rate;
                 SendAccept(sender);
@@ -130,9 +141,10 @@ PollNetwork()
         } break;
         case CL_UPDATE:
         {
-            Client *c = app.clients.Get(sender);
+            Client *c = net.clients.Get(sender);
             if (c)
             {
+                c->last_ack = incoming.expected - 1;
                 c->input = incoming.input;
                 c->rate = incoming.rate;
                 c->last_recv_time = GetTick();
@@ -145,6 +157,16 @@ PollNetwork()
         }
         read_bytes = NetRead(buffer, max_size, &sender);
     }
+}
+
+void
+PrintDebugStuff(GameState state)
+{
+    NetStats stats = NetGetStats();
+    printf("\nx = %d y = %d", state.x, state.y);
+    printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
+    printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
+    printf("\tsequence %d", net.sequence);
 }
 
 int
@@ -162,11 +184,13 @@ main(int argc, char **argv)
 
     uint64 initial_tick = GetTick();
     uint64 last_game_tick = initial_tick;
-    int tickrate = 66;
+    int tickrate = 20;
     int updates_sent = 0;
     float tick_interval = 1.0f / float(tickrate);
     float client_timeout_interval = 2.0f;
-    while (1)
+    app.running = true;
+    net.sequence = 0;
+    while (app.running)
     {
         uint64 tick = GetTick();
         PollNetwork();
@@ -174,22 +198,25 @@ main(int argc, char **argv)
         if (TimeSince(last_game_tick) > tick_interval)
         {
             GameInput inputs[MAX_CONNECTIONS];
-            for (int i = 0; i < app.clients.count; i++)
-                inputs[i] = app.clients.entries[i].input;
-            GameTick(state, inputs, app.clients.count);
+            for (int i = 0; i < net.clients.count; i++)
+                inputs[i] = net.clients.entries[i].input;
+            GameTick(state, inputs, net.clients.count);
             last_game_tick = tick;
+            net.sequence++;
+
+            PrintDebugStuff(state);
         }
 
-        for (int i = 0; i < app.clients.count; i++)
+        for (int i = 0; i < net.clients.count; i++)
         {
-            Client *c = &app.clients.entries[i];
+            Client *c = &net.clients.entries[i];
             int rate = c->rate == 0 ? 20 : c->rate;
             if (TimeSince(c->last_send_time) >
                 1.0f / float(rate))
             {
                 updates_sent++;
                 c->last_send_time = GetTick();
-                SendUpdate(state, app.clients.entries[i].address);
+                SendUpdate(state, net.clients.entries[i].address);
             }
 
             if (TimeSince(c->last_recv_time) >
@@ -198,15 +225,10 @@ main(int argc, char **argv)
                 printf("Client %d.%d.%d.%d timed out.\n",
                        c->address.ip0, c->address.ip1,
                        c->address.ip2, c->address.ip3);
-                i = app.clients.Remove(c);
+                i = net.clients.Remove(c);
             }
         }
-
-        NetStats stats = NetGetStats();
-        printf("\r%d clients\tx = %d\ty = %d\tavg: %.2fKBps out, %.2fKBps in)",
-                app.clients.count,
-                state.x, state.y,
-                stats.avg_bytes_sent / 1024,
-                stats.avg_bytes_read / 1024);
     }
+
+    return 0;
 }

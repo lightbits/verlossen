@@ -14,18 +14,33 @@ static float    g_stats_update_period = 0.5f;
 static int      g_bytes_sent;
 static int      g_bytes_read;
 
-void NetSetPreferredListenPort(uint16 port)
+NetAddress
+NetMakeAddress(uint8 ip0, uint8 ip1,
+uint8 ip2, uint8 ip3, uint16 port)
+{
+    NetAddress result = {};
+    result.ip0 = ip0;
+    result.ip1 = ip1;
+    result.ip2 = ip2;
+    result.ip3 = ip3;
+    result.port = port;
+    return result;
+}
+
+void
+NetSetPreferredListenPort(uint16 port)
 {
     g_preferred_port = port;
 }
 
-void NetClose()
+void
+NetClose()
 {
     WSACleanup();
 }
 
-static
-bool NetInitialize()
+static bool
+NetInitialize()
 {
     WSADATA WsaData;
     if (WSAStartup(MAKEWORD(2, 2), &WsaData) != NO_ERROR)
@@ -67,7 +82,8 @@ bool NetInitialize()
     return true;
 }
 
-int NetSend(NetAddress *destination, const char *data, uint32 data_length)
+int
+NetSend(NetAddress *destination, const char *data, uint32 data_length)
 {
     if (!g_initialized)
     {
@@ -96,7 +112,8 @@ int NetSend(NetAddress *destination, const char *data, uint32 data_length)
     return bytes_sent;
 }
 
-int NetRead(char *data, uint32 max_packet_size, NetAddress *sender)
+int
+NetRead(char *data, uint32 max_packet_size, NetAddress *sender)
 {
     if (!g_initialized)
     {
@@ -130,7 +147,8 @@ int NetRead(char *data, uint32 max_packet_size, NetAddress *sender)
     return bytes_read;
 }
 
-NetStats NetGetStats()
+NetStats
+NetGetStats()
 {
     if (g_last_stats_update == 0)
     {

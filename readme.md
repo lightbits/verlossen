@@ -5,6 +5,9 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 10 (March 13. 2015)###
+Sequence numbers. Drop old, out-of-order packets!
+
 ###Day 9 (March 12. 2015)###
 Progress! Current feature set of the networking module is now
 

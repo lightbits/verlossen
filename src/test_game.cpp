@@ -18,3 +18,11 @@ GameTick(GameState &state, GameInput *inputs, int input_count)
             state.y++;
     }
 }
+
+bool
+IsPacketMoreRecent(Sequence a, Sequence b)
+{
+    uint16 half = (1 << 15);
+    return (b > a && b - a <= half) ||
+           (a > b && a - b >  half);
+}

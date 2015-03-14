@@ -6,6 +6,7 @@
 #define SV_ACCEPT  0xABAD1DEA
 #define SV_UPDATE  0xFABFABFA
 #define SV_REJECT  0xBADBADBA
+typedef uint16 Sequence;
 
 struct GameButton
 {
@@ -31,15 +32,22 @@ struct GameState
 struct ServerPacket
 {
     uint32 protocol;
+    Sequence sequence;
     GameState state;
 };
 
 struct ClientPacket
 {
     uint32 protocol;
+    Sequence expected;
     GameInput input;
     int rate;
 };
+
+// TODO: Figure where this belongs. Perhaps in net module?
+bool IsPacketMoreRecent(
+    Sequence recent_than_this,
+    Sequence is_this_more);
 
 void InitGameState(GameState &state);
 
