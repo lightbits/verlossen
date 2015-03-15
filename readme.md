@@ -5,6 +5,33 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+TODO:
+* Keep an index table in client list for faster traversal.
+  (Though this won't matter one bit in the actual release I suspect...)
+
+###Day 11 (March 15. 2015)###
+Todo:
+* Network module, hide low level interface
+  Add high-level interface (Client/Server packets)
+  Hide decoding and encoding (i.e. input bit packing, ...)
+  Shared and local variables
+  NetSendClientCmd(GameInput input)
+  NetSendSnapshot(GameState state, GameInput *inputs)
+  NetRead(State *state, GameInput *inputs);
+
+* Send all player inputs along with state from server
+* Bitpack input
+* PlayerIndex GameAddPlayer
+* Send player index back to client, so that they can simulate game locally
+* Even better clientlist:
+  Adding/Dropping players should be done in same place where
+  a client is added/removed from clientlist.
+* Better ClientList
+  Way too many bugs have so far arose from having to iterate over
+  MAX_PLAYER_COUNT instead of count. Should probably fix that!
+
+
+
 ###Day 10 (March 13. 2015)###
 Alrighty, got sequence numbers and acknowledgments working. Sequence
 numbers are labels added to the snapshots sent from the server or the

@@ -7,6 +7,9 @@
 #define SV_UPDATE  0xFABFABFA
 #define SV_REJECT  0xBADBADBA
 typedef uint16 Sequence;
+typedef uint8 PlayerNum;
+
+#define MAX_PLAYER_COUNT 4
 
 struct GameButton
 {
@@ -23,12 +26,20 @@ struct GameInput
     GameButton down;
 };
 
-struct GameState
+struct GamePlayer
 {
     int x;
     int y;
+    bool connected;
 };
 
+struct GameState
+{
+    GamePlayer players[MAX_PLAYER_COUNT];
+    int player_count;
+};
+
+// TODO: Move to network module
 struct ServerPacket
 {
     uint32 protocol;
@@ -36,6 +47,7 @@ struct ServerPacket
     GameState state;
 };
 
+// TODO: Move to network module
 struct ClientPacket
 {
     uint32 protocol;
@@ -49,6 +61,13 @@ bool IsPacketMoreRecent(
     Sequence recent_than_this,
     Sequence is_this_more);
 
-void InitGameState(GameState &state);
+PlayerNum GameAddPlayer(GameState &state);
+void GameDropPlayer(GameState &state, PlayerNum index);
+void GameInit(GameState &state);
+
+// The input at a given index must correspond to the
+// player with the same PlayerNum
+void GameTick(GameState &state,
+              GameInput inputs[MAX_PLAYER_COUNT]);
 
 #endif

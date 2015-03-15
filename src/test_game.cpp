@@ -1,21 +1,54 @@
 #include "test_game.h"
 
 void
-InitGameState(GameState &state)
+GameInit(GameState &state)
 {
-    state.x = 1;
-    state.y = 2;
+    state.player_count = 0;
+}
+
+PlayerNum
+GameAddPlayer(GameState &state)
+{
+    Assert(state.player_count < MAX_PLAYER_COUNT);
+    int index = 0;
+    while (index < MAX_PLAYER_COUNT &&
+           state.players[index].connected)
+        index++;
+    Assert(index < MAX_PLAYER_COUNT);
+    GamePlayer player = {};
+    player.connected = true;
+    player.x = 0;
+    player.y = 0;
+    state.players[index] = player;
+    state.player_count++;
+    return PlayerNum(index);
 }
 
 void
-GameTick(GameState &state, GameInput *inputs, int input_count)
+GameDropPlayer(GameState &state, PlayerNum index)
 {
-    for (int i = 0; i < input_count; i++)
+    Assert(index < MAX_PLAYER_COUNT);
+    state.players[index].connected = false;
+    state.player_count--;
+}
+
+void
+PlayerTick(GamePlayer &player, GameInput &input)
+{
+    if (input.action1.is_down)
+        player.x++;
+    if (input.action2.is_down)
+        player.y++;
+}
+
+void
+GameTick(GameState &state, GameInput inputs[MAX_PLAYER_COUNT])
+{
+    for (int i = 0; i < MAX_PLAYER_COUNT; i++)
     {
-        if (inputs[i].action1.is_down)
-            state.x++;
-        else if (inputs[i].action2.is_down)
-            state.y++;
+        if (!state.players[i].connected)
+            continue;
+        PlayerTick(state.players[i], inputs[i]);
     }
 }
 
