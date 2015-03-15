@@ -87,29 +87,29 @@ CreateContext()
 void
 SendInput(GameInput &input)
 {
-    ClientPacket p = {};
+    ClientCmd p = {};
     p.protocol = CL_UPDATE;
+    p.expected = net.expected;
     p.input = input;
     p.rate = net.rate;
-    p.expected = net.expected;
-    NetSend(&net.server, (const char *)&p, sizeof(ClientPacket));
+    NetSend(net.server, p);
 }
 
 void
 SendConnect()
 {
-    ClientPacket p = {};
+    ClientCmd p = {};
     p.protocol = CL_CONNECT;
-    p.rate = net.rate;
     p.expected = net.expected;
-    NetSend(&net.server, (const char*)&p, sizeof(ClientPacket));
+    p.rate = net.rate;
+    NetSend(net.server, p);
 }
 
-int
-LerpInt(int a, int b, float t)
-{
-    return int(a + (b - a) * t);
-}
+// int
+// LerpInt(int a, int b, float t)
+// {
+//     return int(a + (b - a) * t);
+// }
 
 // GameState
 // InterpolateState(
@@ -199,11 +199,9 @@ main(int argc, char **argv)
 
         // printf("%d\n", input_ring.write_index);
 
-        ServerPacket update = {};
-        char *buffer = (char*)&update;
-        int max_size = sizeof(ServerPacket);
-        int read_bytes = NetRead(buffer, max_size, NULL);
-        while (read_bytes > 0)
+        NetAddress sender = {};
+        ServerUpdate update = {};
+        while (NetRead(update, sender))
         {
             last_update_recv = GetTick();
             switch (update.protocol)
@@ -226,7 +224,6 @@ main(int argc, char **argv)
                 }
                 break;
             }
-            read_bytes = NetRead(buffer, max_size, NULL);
         }
 
         if (!net.connected &&

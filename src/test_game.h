@@ -6,7 +6,6 @@
 #define SV_ACCEPT  0xABAD1DEA
 #define SV_UPDATE  0xFABFABFA
 #define SV_REJECT  0xBADBADBA
-typedef uint16 Sequence;
 typedef uint8 PlayerNum;
 
 #define MAX_PLAYER_COUNT 4
@@ -38,28 +37,6 @@ struct GameState
     GamePlayer players[MAX_PLAYER_COUNT];
     int player_count;
 };
-
-// TODO: Move to network module
-struct ServerPacket
-{
-    uint32 protocol;
-    Sequence sequence;
-    GameState state;
-};
-
-// TODO: Move to network module
-struct ClientPacket
-{
-    uint32 protocol;
-    Sequence expected;
-    GameInput input;
-    int rate;
-};
-
-// TODO: Figure where this belongs. Perhaps in net module?
-bool IsPacketMoreRecent(
-    Sequence recent_than_this,
-    Sequence is_this_more);
 
 PlayerNum GameAddPlayer(GameState &state);
 void GameDropPlayer(GameState &state, PlayerNum index);

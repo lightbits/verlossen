@@ -41,7 +41,6 @@ struct ClientList
                 c.address = address;
                 c.connected = true;
                 entries[i] = c;
-                printf("Adding entry\n");
                 count++;
                 return &entries[i];
             }
@@ -82,43 +81,37 @@ static App app;
 void
 SendAccept(NetAddress &to)
 {
-    ServerPacket p = {};
+    ServerUpdate p = {};
     p.protocol = SV_ACCEPT;
     p.sequence = net.sequence;
-    NetSend(&to, (const char*)&p, sizeof(p));
+    NetSend(to, p);
 }
 
 void
 SendReject(NetAddress &to)
 {
-    ServerPacket p = {};
+    ServerUpdate p = {};
     p.protocol = SV_REJECT;
     p.sequence = net.sequence;
-    NetSend(&to, (const char*)&p, sizeof(p));
+    NetSend(to, p);
 }
 
 void
-SendUpdate(GameState &state, NetAddress &to)
+SendUpdate(NetAddress &to, GameState &state)
 {
-    /* TODO: Don't send the entire state
-    */
-
-    ServerPacket p = {};
+    ServerUpdate p = {};
     p.protocol = SV_UPDATE;
     p.state = state;
     p.sequence = net.sequence;
-    NetSend(&to, (const char*)&p, sizeof(p));
+    NetSend(to, p);
 }
 
 void
 PollNetwork(GameState &state)
 {
     NetAddress sender = {};
-    ClientPacket incoming = {};
-    char *buffer = (char*)&incoming;
-    int max_size = sizeof(ClientPacket);
-    int read_bytes = NetRead(buffer, max_size, &sender);
-    while (read_bytes > 0)
+    ClientCmd incoming = {};
+    while (NetRead(incoming, sender))
     {
         switch (incoming.protocol)
         {
@@ -154,7 +147,6 @@ PollNetwork(GameState &state)
             }
         } break;
         }
-        read_bytes = NetRead(buffer, max_size, &sender);
     }
 }
 
@@ -246,7 +238,7 @@ main(int argc, char **argv)
                 1.0f / float(rate))
             {
                 c->last_send_time = GetTick();
-                SendUpdate(state, net.clients.entries[i].address);
+                SendUpdate(net.clients.entries[i].address, state);
             }
 
             if (TimeSince(c->last_recv_time) >
