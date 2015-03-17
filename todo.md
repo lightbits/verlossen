@@ -13,6 +13,25 @@ Todo
 [] Proper animation
 [] Tilemaps? Or just handdraw the bg?
 
+UPnP and NAT traversal
+----------------------
+Since most players are hidden behind a NAT router, they cannot be
+hosts of a game unless they perform a NAT port mapping. The router
+has a table which maps from external (ip, port) to local (ip, port).
+
+For example, your local machine has the IP address 10.11.12.13
+(it is inside a NAT), and it is running an app which listens to port
+31415. Outside users cannot connect to (10.11.12.13, 31415), since
+that ip is not unique for all addresses in the internet. But you can
+tell your router that you wish to map incoming messages with some
+destination port of your choice, to be relayed to your local machine.
+
+I.e. create a map entry which relays messages to the router with destination
+port 20000 to your machine at port 31415.
+
+* http://blogs.msdn.com/b/ncl/archive/2009/07/27/end-to-end-connectivity-with-nat-traversal-.aspx
+* http://www.codeproject.com/Articles/807861/Open-NAT-A-NAT-Traversal-library-for-NET-and-Mono#Deleteing portmappings
+
 Network
 -------
 * Designated world master / host /server of game.
