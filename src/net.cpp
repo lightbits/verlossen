@@ -215,6 +215,7 @@ void WritePlayer(GamePlayer &player, GamePlayerPacket &packet)
 
 void ReadState(GameStatePacket &packet, GameState &state)
 {
+    state.player_count = int(packet.player_count);
     for (int i = 0; i < MAX_PLAYER_COUNT; i++)
         ReadPlayer(packet.players[i], state.players[i]);
 }
@@ -330,4 +331,12 @@ bool NetRead(ClientCmd &cmd, NetAddress &sender)
     ReadClientCmd(packet, result);
     cmd = result;
     return true;
+}
+
+bool
+IsPacketMoreRecent(Sequence a, Sequence b)
+{
+    uint16 half = (1 << 15);
+    return (b > a && b - a <= half) ||
+           (a > b && a - b >  half);
 }

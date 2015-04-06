@@ -30,6 +30,28 @@ static Network net;
 static App app;
 
 void
+PlatformRendererSetColor(uint32 color)
+{
+    SDL_SetRenderDrawColor(app.renderer,
+        (color >> 24) & 0xff,
+        (color >> 16) & 0xff,
+        (color >> 8)  & 0xff,
+        (color)       & 0xff);
+}
+
+void
+PlatformRendererDrawLine(int x0, int y0, int x1, int y1)
+{
+    SDL_RenderDrawLine(app.renderer, x0, y0, x1, y1);
+}
+
+void
+PlatformRendererClear()
+{
+    SDL_RenderClear(app.renderer);
+}
+
+void
 PollInput(GameInput &input)
 {
     SDL_Event event;
@@ -145,7 +167,6 @@ SendConnect()
 int
 main(int argc, char **argv)
 {
-    // TODO: Load config in a better way
     int listen_port = 54321;
     net.cmd_rate = 20;
     net.rate = 20;
@@ -159,16 +180,25 @@ main(int argc, char **argv)
         sscanf(argv[3], "%d", &net.rate);
     }
     NetSetPreferredListenPort(listen_port);
-
-    // TODO: Let user set this in a screen?
     net.server = NetMakeAddress(127, 0, 0, 1, 12345);
 
     if (!CreateContext())
-        return false;
+        return -1;
+
+    GameRenderer renderer = {};
+    renderer.SetColor  = PlatformRendererSetColor;
+    renderer.DrawLine  = PlatformRendererDrawLine;
+    renderer.Clear     = PlatformRendererClear;
+    // renderer.Blit      = PlatformBlit;
+    renderer.res_x     = 320;
+    renderer.res_y     = 160;
+    SDL_RenderSetLogicalSize(app.renderer, renderer.res_x, renderer.res_y);
+
+    GameMemory memory = {};
+    // memory.LoadTexture = PlatformLoadTexture;
+    GameInit(memory.state);
 
     GameInput input = {};
-    GameState state = {};
-    GameInit(state);
 
     // const int LERP_WINDOW = 16; // Should be estimated from RTT
     // GameInput input_buffer[LERP_WINDOW];
@@ -220,7 +250,7 @@ main(int argc, char **argv)
                     // TODO: Sync state, simulation, prediction
                     // printf("Popping input\n");
                     // RingPopStruct(input_ring, GameInput);
-                    state = update.state;
+                    memory.state = update.state;
                 }
                 break;
             }
@@ -253,14 +283,16 @@ main(int argc, char **argv)
         }
 
         NetStats stats = NetGetStats();
-        // printf("\rx = %d y = %d", state.x, state.y);
-        printf("\r");
-        printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
-        printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
-        printf("\tlast recv %d", net.expected - 1);
+        printf("\rx = %d", memory.state.players[0].x);
+        // printf("\r");
+        // printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
+        // printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
+        // printf("\tlast recv %d", net.expected - 1);
+
+        GameRender(memory, renderer);
 
         SDL_RenderPresent(app.renderer);
     }
 
-    return true;
+    return 0;
 }

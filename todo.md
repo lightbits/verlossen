@@ -59,6 +59,7 @@ Game
 Resources
 ---------
 
+* http://sebastiansylvan.com/2013/05/08/robin-hood-hashing-should-be-your-default-hash-table-implementation/
 * https://developer.valvesoftware.com/wiki/Networking_Entities
 * https://developer.valvesoftware.com/wiki/Latency_Compensating_Methods_in_Client/Server_In-game_Protocol_Design_and_Optimization
 * https://developer.valvesoftware.com/wiki/Interpolation

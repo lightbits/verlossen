@@ -61,15 +61,15 @@ void
 GamePushPlayer(GameMemory &memory)
 {
     assert(memory.state.player_count + 1 < MAX_PLAYERS);
-    GamePlayer player = {};
-    player.position = Vec2(2.0f, 2.0f);
-    player.velocity = Vec2(0.0f, 0.0f);
-    player.size = Vec2(0.8f, 1.5f);
-    player.run_acceleration = 22.0f;
-    player.jump_timer = 0.0f;
-    player.jump_duration = 0.05f;
+    GamePlayer player        = {};
+    player.position          = Vec2(2.0f, 2.0f);
+    player.velocity          = Vec2(0.0f, 0.0f);
+    player.size              = Vec2(0.8f, 1.5f);
+    player.run_acceleration  = 22.0f;
+    player.jump_timer        = 0.0f;
+    player.jump_duration     = 0.05f;
     player.jump_acceleration = 100.0f;
-    player.sprite = memory.assets.spr_hero;
+    player.sprite            = memory.assets.spr_hero;
     memory.state.players[memory.state.player_count++] = player;
 }
 

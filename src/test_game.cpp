@@ -1,6 +1,17 @@
 #include "test_game.h"
 
 void
+DrawDebugRectangle(GameRenderer &render, int x, int y, int w, int h,
+                   uint32 color)
+{
+    render.SetColor(color);
+    render.DrawLine(x, y, x + w, y);
+    render.DrawLine(x + w, y, x + w, y + h);
+    render.DrawLine(x, y, x, y + h);
+    render.DrawLine(x, y + h, x + w, y + h);
+}
+
+void
 GameInit(GameState &state)
 {
     state.player_count = 0;
@@ -11,9 +22,11 @@ GameAddPlayer(GameState &state)
 {
     Assert(state.player_count < MAX_PLAYER_COUNT);
     int index = 0;
+    // Find first available player slot
     while (index < MAX_PLAYER_COUNT &&
-           state.players[index].connected)
+           state.players[index].connected) {
         index++;
+    }
     Assert(index < MAX_PLAYER_COUNT);
     GamePlayer player = {};
     player.connected = true;
@@ -35,27 +48,45 @@ GameDropPlayer(GameState &state, PlayerNum index)
 void
 PlayerTick(GamePlayer &player, GameInput &input)
 {
-    if (input.action1.is_down)
-        player.x++;
-    if (input.action2.is_down)
-        player.y++;
+    if (input.left.is_down)  player.x--;
+    if (input.right.is_down) player.x++;
+    if (input.down.is_down)  player.y--;
+    if (input.up.is_down)    player.y++;
 }
 
 void
-GameTick(GameState &state, GameInput inputs[MAX_PLAYER_COUNT])
+GameTick(GameState &state,
+         GameInput *inputs,
+         float dt)
 {
     for (int i = 0; i < MAX_PLAYER_COUNT; i++)
     {
-        if (!state.players[i].connected)
-            continue;
-        PlayerTick(state.players[i], inputs[i]);
+        if (state.players[i].connected)
+            PlayerTick(state.players[i], inputs[i]);
     }
 }
 
-bool
-IsPacketMoreRecent(Sequence a, Sequence b)
+void
+DebugDrawPlayer(GameRenderer &render,
+                GamePlayer &player,
+                int index)
 {
-    uint16 half = (1 << 15);
-    return (b > a && b - a <= half) ||
-           (a > b && a - b >  half);
+    int w = 20;
+    int h = 20;
+    int x = player.x + w / 2;
+    int y = render.res_y - player.y - h;
+    uint32 color = PAL16[1 + index % 15];
+    DrawDebugRectangle(render, x, y, 20, 20, color);
+}
+
+void
+GameRender(GameMemory &memory,
+           GameRenderer &render)
+{
+    render.SetColor(PAL16_VOID);
+    render.Clear();
+    for (int i = 0; i < MAX_PLAYER_COUNT; i++)
+    {
+        DebugDrawPlayer(render, memory.state.players[i], i);
+    }
 }

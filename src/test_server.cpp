@@ -33,19 +33,19 @@ struct ClientList
     {
         if (count >= MAX_PLAYER_COUNT)
             return 0;
-        for (int i = 0; i < MAX_PLAYER_COUNT; i++)
-        {
-            if (!entries[i].connected)
-            {
-                Client c = {};
-                c.address = address;
-                c.connected = true;
-                entries[i] = c;
-                count++;
-                return &entries[i];
-            }
+        // Find first available slot
+        int slot = 0;
+        while (slot < MAX_PLAYER_COUNT &&
+               entries[slot].connected) {
+            slot++;
         }
-        return 0;
+        Assert(slot < MAX_PLAYER_COUNT);
+        Client c = {};
+        c.address = address;
+        c.connected = true;
+        entries[slot] = c;
+        count++;
+        return &entries[slot];
     }
 
     Client *
@@ -199,7 +199,7 @@ main(int argc, char **argv)
 
     uint64 initial_tick = GetTick();
     uint64 last_game_tick = initial_tick;
-    int tickrate = 5;
+    int tickrate = 20;
     float tick_interval = 1.0f / float(tickrate);
     float client_timeout_interval = 2.0f;
     app.running = true;
@@ -220,7 +220,7 @@ main(int argc, char **argv)
                 int input_index = c->player_index;
                 inputs[input_index] = c->last_input;
             }
-            GameTick(state, inputs);
+            GameTick(state, inputs, tick_interval);
             last_game_tick = tick;
             net.sequence++;
 
