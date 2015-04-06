@@ -5,6 +5,16 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 12 (April 6. 2015)###
+Got back from a trip to Japan. Was bam-smack in the middle of hanami-
+season, when all the salarymen go wild under the beautiful cherry
+blossoms. Anyhoo, looking at code I haven't touched in two weeks is
+rather devestating when it comes to motivation. But I grit my teeth
+together and did some small work today - visualizing data from server.
+
+Hopefully I'll implement some state interpolation this week, and bring
+back the actual game code soon!
+
 ###Day 11 (March 15. 2015)###
 Got a bunch of low-level work done today.
 * I added a high-level interface for the network module. So now the
