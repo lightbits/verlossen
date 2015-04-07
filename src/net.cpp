@@ -177,8 +177,8 @@ struct GameInputPacket
 
 struct GamePlayerPacket
 {
-    int32 x;
-    int32 y;
+    float x;
+    float y;
     bool connected;
 };
 
@@ -190,6 +190,7 @@ struct GameStatePacket
 
 struct ServerUpdatePacket
 {
+    PlayerNum player_num;
     Protocol protocol;
     Sequence sequence;
     GameStatePacket state;
@@ -253,6 +254,7 @@ void WriteInput(GameInput &input, GameInputPacket &packet)
 
 void WriteUpdate(ServerUpdate &update, ServerUpdatePacket &packet)
 {
+    packet.player_num = update.player_num;
     packet.protocol = update.protocol;
     packet.sequence = update.sequence;
     WriteState(update.state, packet.state);
@@ -262,6 +264,7 @@ void WriteUpdate(ServerUpdate &update, ServerUpdatePacket &packet)
 
 void ReadUpdate(ServerUpdatePacket &packet, ServerUpdate &update)
 {
+    update.player_num = packet.player_num;
     update.protocol = packet.protocol;
     update.sequence = packet.sequence;
     ReadState(packet.state, update.state);

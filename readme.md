@@ -5,6 +5,32 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 13 (April 7. 2015)###
+Started implementing prediction and interpolation today. If we run the
+game locally on each client, then the clients will eventually be ahead
+of the server in gametime. This is due to the time it takes for bytes
+to go from the server's memory, down the network layers, through the
+tubes, and up your layers into your memory.
+
+Here's a gif showing how we get jitter if we simply set the local state
+equal to the incoming server update
+
+![](./data/jitter.gif)
+
+Totally not cool!
+
+What I tried to do today was something like
+
+    GotServerUpdate:
+        Guesstimate packet delay
+        Project received server state ahead by that amount
+
+But it doesn't look too good yet. To test delays and stuff I use this
+cute application: [Clumsy](http://jagt.github.io/clumsy/). It runs
+without installation, and lets you "inject" stuff like lag, throttling
+or out-of-order packets dynamically. Pretty neat!
+
+
 ###Day 12 (April 6. 2015)###
 Got back from a trip to Japan. Was bam-smack in the middle of hanami-
 season, when all the salarymen go wild under the beautiful cherry

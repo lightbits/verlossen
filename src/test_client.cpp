@@ -14,16 +14,19 @@ struct App
     int window_height;
     const char *title;
     bool running;
+    int tickrate; // Updates/sec the game should run at
 };
 
 struct Network
 {
     NetAddress server;
     bool connected;
-    int cmd_rate;    // Updates/sec we send to server
-    int rate;        // Updates/sec we want from server
-    Sequence sequence; // Tags next update we send to server
-    Sequence expected; // Expected tag of next update from server
+    int cmd_rate;         // Updates/sec we send to server
+    int rate;             // Updates/sec we want from server
+    Sequence sequence;    // Tags next update we send to server
+    Sequence expected;    // Expected tag of next update from server
+    Sequence projected;   // Since we simulate ahead of the server...
+    PlayerNum player_num; // We get this from the server when we connect
 };
 
 static Network net;
@@ -127,42 +130,57 @@ SendConnect()
     NetSend(net.server, p);
 }
 
-// int
-// LerpInt(int a, int b, float t)
-// {
-//     return int(a + (b - a) * t);
-// }
+float
+Lerp(float a, float b, float t)
+{
+    return a + (b - a) * t;
+}
 
-// GameState
-// InterpolateState(
-//     GameState a,
-//     GameState b,
-//     float alpha)
-// {
-//     GameState result = {};
-//     a.x = LerpInt(a.x, b.x, alpha);
-//     b.y = LerpInt(a.y, b.y, alpha);
-//     return result;
-// }
+GamePlayer
+InterpolatePlayer(GamePlayer &a, GamePlayer &b, float t)
+{
+    GamePlayer result = a;
+    result.x = Lerp(a.x, b.x, t);
+    result.y = Lerp(a.y, b.y, t);
+    return result;
+}
 
-// // TODO: Implement this!!
-// GameState
-// PredictState(
-//     GameState initial_state,
-//     RingBuffer local_inputs, // Deliberately a copy
-//     int horizon)
-// {
-//     // TODO: Other player's input. assume constant over horizon?
-//     GameInput inputs[4]; // TODO: Define this param?
-//     // TODO: Need our "input_index" to "player index" mapping
-//     GameState result = initial_state;
-//     for (int i = 0; i < horizon; i++)
-//     {
-//         GameInput *input = RingPopStruct(local_inputs, GameInput);
-//         // tick game, based on everyone elses input as well
-//     }
-//     return result;
-// }
+GameState
+InterpolateState(GameState a, GameState b, float t)
+{
+    GameState result = a;
+    for (int i = 0; i < MAX_PLAYER_COUNT; i++)
+    {
+        result.players[i] = InterpolatePlayer(a.players[i], b.players[i], t);
+    }
+    return result;
+}
+
+GameState
+PredictState(
+    GameState   initial_state,
+    GameInput  *global_inputs, // The other players's latest input
+    PlayerNum   player_index,  // Our player index
+    RingBuffer &input_history,
+    int         horizon,
+    float       dt)
+{
+    // We will only apply the 'n' latest inputs
+    // TODO: Should we rather mark the inputs with timestamps,
+    // and check that the timestamp is in the range (FROM, TO)?
+    while (input_history.GetElementCount() > horizon)
+        RingPopStruct(input_history, GameInput);
+    GameState result = initial_state;
+    for (int i = 0; i < horizon; i++)
+    {
+        GameInput *input = RingPopStruct(input_history, GameInput);
+        if (!input)
+            break; // Not enough inputs in our history!
+        global_inputs[player_index] = *input;
+        GameTick(result, global_inputs, dt);
+    }
+    return result;
+}
 
 int
 main(int argc, char **argv)
@@ -200,61 +218,54 @@ main(int argc, char **argv)
 
     GameInput input = {};
 
-    // const int LERP_WINDOW = 16; // Should be estimated from RTT
-    // GameInput input_buffer[LERP_WINDOW];
-    // RingBuffer input_ring = MakeRingBuffer((uint8*)input_buffer, LERP_WINDOW);
+    /*
+    The updates that we receive from the server are going to be slightly behind
+    our locally running game's time, since we predict ahead when we don't have
+    any updates. To perform smooth interpolation, I store a history of inputs
+    from this client. When I receive a server update, I will re-simulate the
+    game state from that update, for N frames ahead, and blend into the result.
+
+    Now it might be the case that the server update was severely delayed. In
+    which case, we might not have enough history, and we should simply reject
+    the update. I.e. if
+
+        net.projected - incoming_sequence > MAX_INPUT_HISTORY
+
+    then we cannot simulate from the server's update.
+
+    MAX_INPUT_HISTORY * tick_interval is how big delay we can maximally have,
+    in seconds.
+    */
+    const int MAX_INPUT_HISTORY = 32;
+    GameInput input_buffer[MAX_INPUT_HISTORY];
+    RingBuffer input_history = MakeRingBuffer(
+       (uint8*)input_buffer, MAX_INPUT_HISTORY);
 
     app.running = true;
     net.connected = false;
-    int updates_sent = 0;
-    uint64 initial_tick = SDL_GetPerformanceCounter();
-    uint64 last_connection_attempt = initial_tick;
-    uint64 last_update_sent = initial_tick;
-    uint64 last_update_recv = initial_tick;
-    float server_timeout_interval = 2.0f;
+    app.tickrate = 20;
+    uint64 initial_tick               = SDL_GetPerformanceCounter();
+    uint64 last_connection_attempt    = initial_tick;
+    uint64 last_update_sent           = initial_tick;
+    uint64 last_update_recv           = initial_tick;
+    uint64 last_game_tick             = initial_tick;
+    float tick_interval               = 1.0f / float(app.tickrate);
+    float send_update_interval        = 1.0f / float(net.cmd_rate);
     float connection_attempt_interval = 1.0f;
-    float send_update_interval = 1.0f / float(net.cmd_rate);
+    float server_timeout_interval     = 2.0f;
+    float estimated_rtt               = 0.0f;
     while (app.running)
     {
         uint64 frame_tick = SDL_GetPerformanceCounter();
         PollInput(input);
 
-        // GameInput *next = RingPushStruct(input_ring, GameInput);
-        // if (!next)
-        // {
-        //     RingPopStruct(input_ring, GameInput);
-        //     next = RingPushStruct(input_ring, GameInput);
-        // }
-        // *next = input;
-
-        // printf("%d\n", input_ring.write_index);
-
-        NetAddress sender = {};
-        ServerUpdate update = {};
-        while (NetRead(update, sender))
+        GameInput *next = RingPushStruct(input_history, GameInput);
+        if (!next)
         {
-            last_update_recv = GetTick();
-            switch (update.protocol)
-            {
-            case SV_ACCEPT:
-                net.expected = update.sequence + 1;
-                net.connected = true;
-                break;
-            case SV_UPDATE:
-                if (IsPacketMoreRecent(
-                    net.expected,
-                    update.sequence))
-                {
-                    net.expected = update.sequence + 1;
-
-                    // TODO: Sync state, simulation, prediction
-                    // printf("Popping input\n");
-                    // RingPopStruct(input_ring, GameInput);
-                    memory.state = update.state;
-                }
-                break;
-            }
+            RingPopStruct(input_history, GameInput);
+            next = RingPushStruct(input_history, GameInput);
         }
+        *next = input;
 
         if (!net.connected &&
             TimeSince(last_connection_attempt) >
@@ -269,7 +280,6 @@ main(int argc, char **argv)
             TimeSince(last_update_sent) >
             send_update_interval)
         {
-            updates_sent++;
             SendInput(input);
             last_update_sent = frame_tick;
         }
@@ -282,12 +292,63 @@ main(int argc, char **argv)
             net.connected = false;
         }
 
+        NetAddress sender = {};
+        ServerUpdate update = {};
+        while (NetRead(update, sender))
+        {
+            last_update_recv = GetTick();
+            switch (update.protocol)
+            {
+            case SV_ACCEPT:
+                net.expected = update.sequence + 1;
+                net.connected = true;
+                net.player_num = update.player_num;
+                break;
+
+            case SV_UPDATE:
+                if (!IsPacketMoreRecent(net.expected, update.sequence))
+                    break;
+
+                net.expected = update.sequence + 1;
+
+                // 1: Guesstimate the packet delay
+                // and compute the corresponding prediction horizon
+                // TODO: Estimate via Pinging the server (rtt)
+                // int packet_delay = 20;
+                int horizon = 20;
+
+                // 2: This means we think that the game state (server side)
+                // is actually something like net.expected + packet_delay
+                // So we need to simulate our local state up to that point
+                // (I call this "projecting the state").
+                memory.state = PredictState(update.state,
+                               update.inputs,
+                               net.player_num,
+                               input_history,
+                               horizon,
+                               tick_interval);
+
+                net.projected = update.sequence + horizon;
+                break;
+            }
+        }
+
+        // if (net.connected &&
+        //     TimeSince(last_game_tick) > tick_interval)
+        // {
+        //     net.projected++;
+        //     update.inputs[net.player_num] = input;
+        //     last_game_tick = frame_tick;
+        //     GameTick(memory.state, update.inputs, tick_interval);
+        // }
+
         NetStats stats = NetGetStats();
-        printf("\rx = %d", memory.state.players[0].x);
-        // printf("\r");
-        // printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
-        // printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
-        // printf("\tlast recv %d", net.expected - 1);
+        printf("\r");
+        printf("x = %.2f", memory.state.players[0].x);
+        printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
+        printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
+        printf("\tahead by %.2f ms   ",
+            1000.0f * float(net.projected - net.expected) * tick_interval);
 
         GameRender(memory, renderer);
 

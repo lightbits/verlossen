@@ -174,7 +174,7 @@ PrintDebugStuff(GameState state)
                    address.ip0, address.ip1,
                    address.ip2, address.ip3,
                    address.port);
-            printf("%d %d\n",
+            printf("%.2f %.2f\n",
                    state.players[player_index].x,
                    state.players[player_index].y);
         }
@@ -201,7 +201,7 @@ main(int argc, char **argv)
     uint64 last_game_tick = initial_tick;
     int tickrate = 20;
     float tick_interval = 1.0f / float(tickrate);
-    float client_timeout_interval = 2.0f;
+    float client_timeout_interval = 5.0f;
     app.running = true;
     net.sequence = 0;
     while (app.running)

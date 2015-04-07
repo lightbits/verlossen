@@ -33,8 +33,9 @@ bool IsPacketMoreRecent(
 
 struct ServerUpdate
 {
-    Protocol protocol;
-    Sequence sequence;
+    PlayerNum player_num;
+    Protocol  protocol;
+    Sequence  sequence;
     GameState state;
     GameInput inputs[MAX_PLAYER_COUNT];
 };

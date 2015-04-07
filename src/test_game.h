@@ -57,8 +57,8 @@ struct GameInput
 
 struct GamePlayer
 {
-    int x;
-    int y;
+    float x;
+    float y;
     bool connected;
 };
 

@@ -10,6 +10,8 @@ struct RingBuffer
 
     void *Push(uint32 size);
     void *Pop(uint32 size);
+
+    int GetElementCount();
 };
 
 RingBuffer MakeRingBuffer(uint8 *buffer, uint32 max_data_count);

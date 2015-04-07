@@ -46,12 +46,13 @@ GameDropPlayer(GameState &state, PlayerNum index)
 }
 
 void
-PlayerTick(GamePlayer &player, GameInput &input)
+PlayerTick(GamePlayer &player, GameInput &input, float dt)
 {
-    if (input.left.is_down)  player.x--;
-    if (input.right.is_down) player.x++;
-    if (input.down.is_down)  player.y--;
-    if (input.up.is_down)    player.y++;
+    float speed = 40.0f;
+    if (input.left.is_down)  player.x -= speed * dt;
+    if (input.right.is_down) player.x += speed * dt;
+    if (input.down.is_down)  player.y -= speed * dt;
+    if (input.up.is_down)    player.y += speed * dt;
 }
 
 void
@@ -62,7 +63,7 @@ GameTick(GameState &state,
     for (int i = 0; i < MAX_PLAYER_COUNT; i++)
     {
         if (state.players[i].connected)
-            PlayerTick(state.players[i], inputs[i]);
+            PlayerTick(state.players[i], inputs[i], dt);
     }
 }
 
