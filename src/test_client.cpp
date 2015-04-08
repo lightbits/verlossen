@@ -161,17 +161,14 @@ PredictState(
     GameState   initial_state,
     GameInput  *global_inputs, // The other players's latest input
     PlayerNum   player_index,  // Our player index
-    RingBuffer &input_history,
-    int         horizon,
+    RingBuffer  input_history,
+    int         rtt,
     float       dt)
 {
-    // We will only apply the 'n' latest inputs
-    // TODO: Should we rather mark the inputs with timestamps,
-    // and check that the timestamp is in the range (FROM, TO)?
-    while (input_history.GetElementCount() > horizon)
+    while (input_history.GetElementCount() > rtt)
         RingPopStruct(input_history, GameInput);
     GameState result = initial_state;
-    for (int i = 0; i < horizon; i++)
+    for (int i = 0; i < rtt / 2; i++)
     {
         GameInput *input = RingPopStruct(input_history, GameInput);
         if (!input)
@@ -218,24 +215,9 @@ main(int argc, char **argv)
 
     GameInput input = {};
 
-    /*
-    The updates that we receive from the server are going to be slightly behind
-    our locally running game's time, since we predict ahead when we don't have
-    any updates. To perform smooth interpolation, I store a history of inputs
-    from this client. When I receive a server update, I will re-simulate the
-    game state from that update, for N frames ahead, and blend into the result.
+    GameState state_server    = {};
+    GameState state_predicted = {};
 
-    Now it might be the case that the server update was severely delayed. In
-    which case, we might not have enough history, and we should simply reject
-    the update. I.e. if
-
-        net.projected - incoming_sequence > MAX_INPUT_HISTORY
-
-    then we cannot simulate from the server's update.
-
-    MAX_INPUT_HISTORY * tick_interval is how big delay we can maximally have,
-    in seconds.
-    */
     const int MAX_INPUT_HISTORY = 32;
     GameInput input_buffer[MAX_INPUT_HISTORY];
     RingBuffer input_history = MakeRingBuffer(
@@ -253,7 +235,6 @@ main(int argc, char **argv)
     float send_update_interval        = 1.0f / float(net.cmd_rate);
     float connection_attempt_interval = 1.0f;
     float server_timeout_interval     = 2.0f;
-    float estimated_rtt               = 0.0f;
     while (app.running)
     {
         uint64 frame_tick = SDL_GetPerformanceCounter();
@@ -292,6 +273,8 @@ main(int argc, char **argv)
             net.connected = false;
         }
 
+        static int estimated_rtt = 12; // in ticks
+
         NetAddress sender = {};
         ServerUpdate update = {};
         while (NetRead(update, sender))
@@ -311,48 +294,57 @@ main(int argc, char **argv)
 
                 net.expected = update.sequence + 1;
 
-                // 1: Guesstimate the packet delay
-                // and compute the corresponding prediction horizon
-                // TODO: Estimate via Pinging the server (rtt)
-                // int packet_delay = 20;
-                int horizon = 20;
-
-                // 2: This means we think that the game state (server side)
-                // is actually something like net.expected + packet_delay
-                // So we need to simulate our local state up to that point
-                // (I call this "projecting the state").
-                memory.state = PredictState(update.state,
+                state_server = update.state;
+                state_predicted = PredictState(update.state,
                                update.inputs,
                                net.player_num,
                                input_history,
-                               horizon,
+                               estimated_rtt,
                                tick_interval);
 
-                net.projected = update.sequence + horizon;
                 break;
             }
         }
 
-        // if (net.connected &&
-        //     TimeSince(last_game_tick) > tick_interval)
+        if (input.action1.is_down)
+            memory.state = state_server;
+
+        // if (input.action1.is_down)
         // {
-        //     net.projected++;
-        //     update.inputs[net.player_num] = input;
-        //     last_game_tick = frame_tick;
-        //     GameTick(memory.state, update.inputs, tick_interval);
+        //     estimated_rtt++;
+        //     printf("horizon = %d\n", estimated_rtt);
+        // }
+        // if (input.action2.is_down && estimated_rtt > 0)
+        // {
+        //     estimated_rtt--;
+        //     printf("horizon = %d\n", estimated_rtt);
         // }
 
-        NetStats stats = NetGetStats();
-        printf("\r");
-        printf("x = %.2f", memory.state.players[0].x);
-        printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
-        printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
-        printf("\tahead by %.2f ms   ",
-            1000.0f * float(net.projected - net.expected) * tick_interval);
+        if (net.connected &&
+            TimeSince(last_game_tick) > tick_interval)
+        {
+            net.projected++;
+            update.inputs[net.player_num] = input;
+            last_game_tick = frame_tick;
+            GameTick(memory.state, update.inputs, tick_interval);
+        }
 
-        GameRender(memory, renderer);
+        renderer.SetColor(PAL16_VOID);
+        renderer.Clear();
+        DebugGameRender(memory.state, renderer, PAL16_BLAZE);
+        DebugGameRender(state_server, renderer, PAL16_ASH);
+        DebugGameRender(state_predicted, renderer, PAL16_SEABLUE);
+        // GameRender(memory, renderer);
 
         SDL_RenderPresent(app.renderer);
+
+        // NetStats stats = NetGetStats();
+        // printf("\r");
+        // printf("x = %.2f", memory.state.players[0].x);
+        // printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
+        // printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
+        // printf("\tahead by %.2f ms   ",
+        //     1000.0f * float(net.projected - net.expected) * tick_interval);
     }
 
     return 0;

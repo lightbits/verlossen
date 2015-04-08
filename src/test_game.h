@@ -95,4 +95,9 @@ void
 GameRender(GameMemory &memory,
            GameRenderer &renderer);
 
+void
+DebugGameRender(GameState &state,
+                GameRenderer &render,
+                uint32 color);
+
 #endif

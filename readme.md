@@ -5,15 +5,75 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
-###Day 13 (April 7. 2015)###
-Started implementing prediction and interpolation today. If we run the
-game locally on each client, then the clients will eventually be ahead
-of the server in gametime. This is due to the time it takes for bytes
-to go from the server's memory, down the network layers, through the
-tubes, and up your layers into your memory.
+###Day 14 (April 8. 2015)###
+Sweet! I think I've got something that sorta kinda works now! The gif below shows my progress. The white square is the server state, the orange is our locally simulated state and the blue square is the predicted state.
 
-Here's a gif showing how we get jitter if we simply set the local state
-equal to the incoming server update
+![](./data/predict.gif)
+
+The problem I was trying to solve was sort of vague and floaty until I actually sat down with pen and paper today. The previous devlog entries didn't really explain what the issue was, or how to solve it. But I think I can do a better attempt now.
+
+
+    | = Network event.
+    + = Game tick
+
+          B C
+    |-+-+-+-|-+-+-+-|-+-+-+-|-+-+-+-|-+-+-+-| Server ticks
+         /   \
+        /      \
+       /         \
+    +-|-+-+-+-|-+-+-+-|-+-+-+-|-+-+-+-|-+-+-+ Client ticks
+      A           D
+
+Consider the above diagram. The client and server both run at the same tickrate, but may not be synchronized. Here's a run-down:
+
+* At time A, the client sends its input to the server. This takes time, and the server first gets the input at time B.
+
+* At time C it is time to send a snapshot to all clients, and the server does so.
+
+* Our client gets the snapshot at time D.
+
+The issue here is two-fold.
+
+ 1. The server gets our input delayed by B - A time.
+ 2. The client gets the snapshot delayed by D - C.
+
+I don't really know what to do about the first issue, so I'll only consider the second issue. Now why is the snapshot delay a problem? Let me show you:
+
+![](./data/lag.gif)
+
+As before, orange square is local simulation, white is server update.
+
+In most cases, unless your game is running on localhost, you're going to have some network lag. This lag causes a noticeable delay between keypresses and getting a response from the server. For real-time applications like games, this is unacceptable.
+
+That is where prediction can help us.
+
+          B C
+    |-+-+-+-|-+-+-+-|-+-+-+-|-+-+-+-|-+-+-+-| Server ticks
+         /   \
+        /      \
+       /         \
+    +-|-+-+-+-|-+-+-+-|-+-+-+-|-+-+-+-|-+-+-+ Client ticks
+      A           D
+
+Referring to the diagram again: what we want to do, whenever we get a server update, is to predict what we think the state actually is at the server at that point in time. I.e. if we receive a snapshot at time D sent at time C from the server, we want to predict what a snapshot sent at time D would look like, using the latest snapshot.
+
+The way I do this, is that I guesstimate the round-trip-time D-A, and approximate the prediction time D-C by half this amount. This isn't going to be accurate, but it will hopefully be in the ballpark of the actual value.
+
+I then use the input history from time A and onwards, and simulate the latest snapshot forward for however many ticks I estimate I need. A mistake I did here first time around, was to use the "N latest" input values of the history. But that clearly isn't right, since it was the "N first" since A that will actually be used on the server to produce the snapshot at time D.
+
+The way I think about the input history is like a sliding window, that keeps N latest inputs. Now I store more inputs than what constitutes the prediction interval, so I need to fast-forward until there remain what corresponds to D-A ticks worth of inputs. You can see this in my code.
+
+To justify the use of round-trip-time, I'll mention the numbers used in the first gif. It was running with 100 ms inbound and outbound network lag. Which corresponds to a 400 ms round-trip-time. I set the estimated round-trip-time to 12 ticks, or 600 ms with a tickrate of 20 ticks/sec. So it's in the ballpark-range atleast.
+
+###Making it better###
+You can tell that using the blue square somewhat solves the delay problem, but we have another problem. And that is jitter. The orange square is clearly more smooth, so we would like to somehow have the best from both squares - accuracy (blue) and smoothness (orange).
+
+I haven't tackled this yet, it will be the problem for the next coming days, but my plan is to perform some blending between the two.
+
+###Day 13 (April 7. 2015)###
+Started implementing prediction and interpolation today. If we run the game locally on each client, then the clients will eventually be ahead of the server in gametime. This is due to the time it takes for bytes to go from the server's memory, down the network layers, through the tubes, and up your layers into your memory.
+
+Here's a gif showing how we get jitter if we simply set the local state equal to the incoming server update
 
 ![](./data/jitter.gif)
 

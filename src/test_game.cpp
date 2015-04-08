@@ -70,13 +70,12 @@ GameTick(GameState &state,
 void
 DebugDrawPlayer(GameRenderer &render,
                 GamePlayer &player,
-                int index)
+                uint32 color)
 {
     int w = 20;
     int h = 20;
     int x = player.x + w / 2;
     int y = render.res_y - player.y - h;
-    uint32 color = PAL16[1 + index % 15];
     DrawDebugRectangle(render, x, y, 20, 20, color);
 }
 
@@ -88,6 +87,18 @@ GameRender(GameMemory &memory,
     render.Clear();
     for (int i = 0; i < MAX_PLAYER_COUNT; i++)
     {
-        DebugDrawPlayer(render, memory.state.players[i], i);
+        uint32 color = PAL16[1 + i % 15];
+        DebugDrawPlayer(render, memory.state.players[i], color);
+    }
+}
+
+void
+DebugGameRender(GameState &state,
+                GameRenderer &render,
+                uint32 color)
+{
+    for (int i = 0; i < MAX_PLAYER_COUNT; i++)
+    {
+        DebugDrawPlayer(render, state.players[i], color);
     }
 }
