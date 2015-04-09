@@ -193,6 +193,7 @@ struct ServerUpdatePacket
     PlayerNum player_num;
     Protocol protocol;
     Sequence sequence;
+    Sequence acknowledge;
     GameStatePacket state;
     GameInputPacket inputs[MAX_PLAYER_COUNT];
 };
@@ -257,6 +258,7 @@ void WriteUpdate(ServerUpdate &update, ServerUpdatePacket &packet)
     packet.player_num = update.player_num;
     packet.protocol = update.protocol;
     packet.sequence = update.sequence;
+    packet.acknowledge = update.acknowledge;
     WriteState(update.state, packet.state);
     for (int i = 0; i < MAX_PLAYER_COUNT; i++)
         WriteInput(update.inputs[i], packet.inputs[i]);
@@ -267,6 +269,7 @@ void ReadUpdate(ServerUpdatePacket &packet, ServerUpdate &update)
     update.player_num = packet.player_num;
     update.protocol = packet.protocol;
     update.sequence = packet.sequence;
+    update.acknowledge = packet.acknowledge;
     ReadState(packet.state, update.state);
     for (int i = 0; i < MAX_PLAYER_COUNT; i++)
         ReadInput(packet.inputs[i], update.inputs[i]);
@@ -295,7 +298,8 @@ bool NetRead(ServerUpdate &update, NetAddress &sender)
 struct ClientCmdPacket
 {
     Protocol protocol;
-    Sequence expected;
+    Sequence acknowledge;
+    Sequence sequence;
     GameInputPacket input;
     int32 rate;
 };
@@ -303,7 +307,8 @@ struct ClientCmdPacket
 void WriteClientCmd(ClientCmd &cmd, ClientCmdPacket &packet)
 {
     packet.protocol = cmd.protocol;
-    packet.expected = cmd.expected;
+    packet.acknowledge = cmd.acknowledge;
+    packet.sequence = cmd.sequence;
     WriteInput(cmd.input, packet.input);
     packet.rate = cmd.rate;
 }
@@ -311,7 +316,8 @@ void WriteClientCmd(ClientCmd &cmd, ClientCmdPacket &packet)
 void ReadClientCmd(ClientCmdPacket &packet, ClientCmd &cmd)
 {
     cmd.protocol = packet.protocol;
-    cmd.expected = packet.expected;
+    cmd.acknowledge = packet.acknowledge;
+    cmd.sequence = packet.sequence;
     ReadInput(packet.input, cmd.input);
     cmd.rate = packet.rate;
 }

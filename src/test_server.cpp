@@ -8,7 +8,8 @@ struct Client
 {
     NetAddress address;
     PlayerNum  player_index;
-    Sequence   last_ack;
+    Sequence   last_snap_ack;
+    Sequence   last_cmd_recv;
     GameInput  last_input;
     uint64     last_recv_time;
     uint64     last_send_time;
@@ -97,12 +98,13 @@ SendReject(NetAddress &to)
 }
 
 void
-SendUpdate(NetAddress &to, GameState &state)
+SendUpdate(NetAddress &to, GameState &state, Sequence last_cmd_recv)
 {
     ServerUpdate p = {};
     p.protocol = SV_UPDATE;
     p.state = state;
     p.sequence = net.sequence;
+    p.acknowledge = last_cmd_recv;
     NetSend(to, p);
 }
 
@@ -121,7 +123,8 @@ PollNetwork(GameState &state)
             if (c)
             {
                 c->player_index = GameAddPlayer(state);
-                c->last_ack = incoming.expected - 1;
+                c->last_snap_ack = incoming.acknowledge;
+                c->last_cmd_recv = incoming.sequence;
                 c->last_recv_time = GetTick();
                 c->rate = incoming.rate;
                 SendAccept(sender);
@@ -137,7 +140,8 @@ PollNetwork(GameState &state)
             if (c)
             {
                 c->last_input = incoming.input;
-                c->last_ack = incoming.expected - 1;
+                c->last_snap_ack = incoming.acknowledge;
+                c->last_cmd_recv = incoming.sequence;
                 c->rate = incoming.rate;
                 c->last_recv_time = GetTick();
             }
@@ -161,7 +165,7 @@ PrintDebugStuff(GameState state)
         Client *c = &net.clients.entries[i];
         NetAddress address = c->address;
         PlayerNum  player_index = c->player_index;
-        Sequence   last_ack = c->last_ack;
+        Sequence   last_snap_ack = c->last_snap_ack;
         GameInput  last_input = c->last_input;
         uint64     last_recv_time = c->last_recv_time;
         uint64     last_send_time = c->last_send_time;
@@ -238,7 +242,8 @@ main(int argc, char **argv)
                 1.0f / float(rate))
             {
                 c->last_send_time = GetTick();
-                SendUpdate(net.clients.entries[i].address, state);
+                SendUpdate(net.clients.entries[i].address, state,
+                           c->last_cmd_recv);
             }
 
             if (TimeSince(c->last_recv_time) >

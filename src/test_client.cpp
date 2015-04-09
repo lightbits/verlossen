@@ -23,10 +23,15 @@ struct Network
     bool connected;
     int cmd_rate;         // Updates/sec we send to server
     int rate;             // Updates/sec we want from server
-    Sequence sequence;    // Tags next update we send to server
-    Sequence expected;    // Expected tag of next update from server
-    Sequence projected;   // Since we simulate ahead of the server...
     PlayerNum player_num; // We get this from the server when we connect
+    Sequence input_sequence;
+    Sequence last_server_snap;
+};
+
+struct InputHistoric
+{
+    Sequence sequence;
+    GameInput input;
 };
 
 static Network net;
@@ -114,7 +119,8 @@ SendInput(GameInput &input)
 {
     ClientCmd p = {};
     p.protocol = CL_UPDATE;
-    p.expected = net.expected;
+    p.sequence = net.input_sequence;
+    p.acknowledge = net.last_server_snap;
     p.input = input;
     p.rate = net.rate;
     NetSend(net.server, p);
@@ -125,7 +131,8 @@ SendConnect()
 {
     ClientCmd p = {};
     p.protocol = CL_CONNECT;
-    p.expected = net.expected;
+    p.sequence = net.input_sequence;
+    p.acknowledge = net.last_server_snap;
     p.rate = net.rate;
     NetSend(net.server, p);
 }
@@ -162,20 +169,22 @@ PredictState(
     GameInput  *global_inputs, // The other players's latest input
     PlayerNum   player_index,  // Our player index
     RingBuffer  input_history,
-    int         rtt,
+    Sequence    last_acknowledged_input,
     float       dt)
 {
-    while (input_history.GetElementCount() > rtt)
-        RingPopStruct(input_history, GameInput);
+    InputHistoric *input = RingPopStruct(input_history, InputHistoric);
+    while (input && input->sequence < last_acknowledged_input)
+        input = RingPopStruct(input_history, InputHistoric);
     GameState result = initial_state;
-    for (int i = 0; i < rtt / 2; i++)
+    while (input)
     {
-        GameInput *input = RingPopStruct(input_history, GameInput);
-        if (!input)
-            break; // Not enough inputs in our history!
-        global_inputs[player_index] = *input;
+        printf(".");
+        global_inputs[player_index] = input->input;
         GameTick(result, global_inputs, dt);
+        input = RingPopStruct(input_history, InputHistoric);
+
     }
+    printf("\n");
     return result;
 }
 
@@ -219,7 +228,7 @@ main(int argc, char **argv)
     GameState state_predicted = {};
 
     const int MAX_INPUT_HISTORY = 32;
-    GameInput input_buffer[MAX_INPUT_HISTORY];
+    InputHistoric input_buffer[MAX_INPUT_HISTORY];
     RingBuffer input_history = MakeRingBuffer(
        (uint8*)input_buffer, MAX_INPUT_HISTORY);
 
@@ -238,15 +247,6 @@ main(int argc, char **argv)
     while (app.running)
     {
         uint64 frame_tick = SDL_GetPerformanceCounter();
-        PollInput(input);
-
-        GameInput *next = RingPushStruct(input_history, GameInput);
-        if (!next)
-        {
-            RingPopStruct(input_history, GameInput);
-            next = RingPushStruct(input_history, GameInput);
-        }
-        *next = input;
 
         if (!net.connected &&
             TimeSince(last_connection_attempt) >
@@ -261,7 +261,11 @@ main(int argc, char **argv)
             TimeSince(last_update_sent) >
             send_update_interval)
         {
+            // Only poll as often as we send. Is this actually a good idea?
+            PollInput(input);
+
             SendInput(input);
+            net.input_sequence++;
             last_update_sent = frame_tick;
         }
 
@@ -273,8 +277,6 @@ main(int argc, char **argv)
             net.connected = false;
         }
 
-        static int estimated_rtt = 12; // in ticks
-
         NetAddress sender = {};
         ServerUpdate update = {};
         while (NetRead(update, sender))
@@ -283,57 +285,58 @@ main(int argc, char **argv)
             switch (update.protocol)
             {
             case SV_ACCEPT:
-                net.expected = update.sequence + 1;
+                net.last_server_snap = update.sequence;
                 net.connected = true;
                 net.player_num = update.player_num;
                 break;
 
             case SV_UPDATE:
-                if (!IsPacketMoreRecent(net.expected, update.sequence))
+                if (!IsPacketMoreRecent(net.last_server_snap, update.sequence))
                     break;
 
-                net.expected = update.sequence + 1;
+                net.last_server_snap = update.sequence;
 
                 state_server = update.state;
                 state_predicted = PredictState(update.state,
                                update.inputs,
                                net.player_num,
                                input_history,
-                               estimated_rtt,
+                               update.acknowledge,
                                tick_interval);
 
+                // Inputs that are yet to be processed by the server:
+                // printf("unprocessed: %d\n", net.input_sequence - update.acknowledge);
                 break;
             }
         }
 
+
         if (input.action1.is_down)
             memory.state = state_server;
-
-        // if (input.action1.is_down)
-        // {
-        //     estimated_rtt++;
-        //     printf("horizon = %d\n", estimated_rtt);
-        // }
-        // if (input.action2.is_down && estimated_rtt > 0)
-        // {
-        //     estimated_rtt--;
-        //     printf("horizon = %d\n", estimated_rtt);
-        // }
 
         if (net.connected &&
             TimeSince(last_game_tick) > tick_interval)
         {
-            net.projected++;
+            InputHistoric *next = RingPushStruct(input_history, InputHistoric);
+            if (!next)
+            {
+                RingPopStruct(input_history, InputHistoric);
+                next = RingPushStruct(input_history, InputHistoric);
+            }
+            next->input = input;
+            next->sequence = net.input_sequence;
+
             update.inputs[net.player_num] = input;
             last_game_tick = frame_tick;
             GameTick(memory.state, update.inputs, tick_interval);
+            memory.state = InterpolateState(memory.state, state_predicted, 0.12f);
         }
 
         renderer.SetColor(PAL16_VOID);
         renderer.Clear();
-        DebugGameRender(memory.state, renderer, PAL16_BLAZE);
         DebugGameRender(state_server, renderer, PAL16_ASH);
         DebugGameRender(state_predicted, renderer, PAL16_SEABLUE);
+        DebugGameRender(memory.state, renderer, PAL16_BLAZE);
         // GameRender(memory, renderer);
 
         SDL_RenderPresent(app.renderer);
@@ -343,8 +346,6 @@ main(int argc, char **argv)
         // printf("x = %.2f", memory.state.players[0].x);
         // printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
         // printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
-        // printf("\tahead by %.2f ms   ",
-        //     1000.0f * float(net.projected - net.expected) * tick_interval);
     }
 
     return 0;

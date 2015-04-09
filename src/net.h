@@ -36,6 +36,7 @@ struct ServerUpdate
     PlayerNum player_num;
     Protocol  protocol;
     Sequence  sequence;
+    Sequence  acknowledge;
     GameState state;
     GameInput inputs[MAX_PLAYER_COUNT];
 };
@@ -43,7 +44,8 @@ struct ServerUpdate
 struct ClientCmd
 {
     Protocol protocol;
-    Sequence expected;
+    Sequence sequence;
+    Sequence acknowledge;
     GameInput input;
     int rate;
 };

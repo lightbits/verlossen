@@ -5,6 +5,37 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 15 (April 9. 2015)###
+Alright, I did some due diligence and found out that guesstimating round-trip-time was the wrong way to go. This article [here](http://www.gabrielgambetta.com/fpm_live.html) shows an approach where the server tells the client which input it processed last. Given that information, we can predict the server state more accurately by playing back inputs from the last one we know was processed! Here's how it looks:
+
+![](./data/predict2.gif)
+
+Notice how there's no error at the end, as opposed to my previous attempt.
+
+So yesterday I mentioned that there was another problem, namely the jitter that is apparent from the motion of the blue square. I made an attempt to fix that today, by a simple linear combination that I apply each frame. It looks like this:
+
+![](./data/predict_lerp.gif)
+
+The way it works is something like
+
+    loop:
+      when: receive update from server
+        B = update.state
+
+      when: time to update game
+        UpdateGame(A)
+        InterpolateState(A, B, lerp)
+
+      RenderGame(A)
+
+where **InterpolateState** performs the blending **(A = A + (B - A) * lerp)** for each player position component. So if state B is constant, the rendered state A will eventually converge to B. You can see this by expanding the expression, and seeing that it forms a geometric series.
+
+Interpolation is particularly useful if you have packet drop (say 40% of it, as in the gif), since it hides most of the extreme jitter that would otherwise make the game unplayable:
+
+![](./data/predict_lerp_drop.gif)
+
+If you look closely, you can see the orange square speeding up and slowing down. This is something I would like to fix. Perhaps by using a different interpolation function?
+
 ###Day 14 (April 8. 2015)###
 Sweet! I think I've got something that sorta kinda works now! The gif below shows my progress. The white square is the server state, the orange is our locally simulated state and the blue square is the predicted state.
 
