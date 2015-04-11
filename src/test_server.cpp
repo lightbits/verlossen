@@ -7,9 +7,10 @@
 struct Client
 {
     NetAddress address;
-    PlayerNum  player_index;
+    PlayerNum  player_num;
     Sequence   last_snap_ack;
     Sequence   last_cmd_recv;
+    Sequence   last_cmd_used;
     GameInput  last_input;
     uint64     last_recv_time;
     uint64     last_send_time;
@@ -80,12 +81,13 @@ static Network net;
 static App app;
 
 void
-SendAccept(NetAddress &to)
+SendAccept(Client &to)
 {
     ServerUpdate p = {};
     p.protocol = SV_ACCEPT;
     p.sequence = net.sequence;
-    NetSend(to, p);
+    p.player_num = to.player_num;
+    NetSend(to.address, p);
 }
 
 void
@@ -98,14 +100,15 @@ SendReject(NetAddress &to)
 }
 
 void
-SendUpdate(NetAddress &to, GameState &state, Sequence last_cmd_recv)
+SendUpdate(Client &to, GameState &state)
 {
     ServerUpdate p = {};
     p.protocol = SV_UPDATE;
     p.state = state;
     p.sequence = net.sequence;
-    p.acknowledge = last_cmd_recv;
-    NetSend(to, p);
+    p.player_num = to.player_num;
+    p.acknowledge = to.last_cmd_used;
+    NetSend(to.address, p);
 }
 
 void
@@ -122,12 +125,12 @@ PollNetwork(GameState &state)
             Client *c = net.clients.Add(sender);
             if (c)
             {
-                c->player_index = GameAddPlayer(state);
+                c->player_num = GameAddPlayer(state);
                 c->last_snap_ack = incoming.acknowledge;
                 c->last_cmd_recv = incoming.sequence;
                 c->last_recv_time = GetTick();
                 c->rate = incoming.rate;
-                SendAccept(sender);
+                SendAccept(*c);
             }
             else
             {
@@ -164,7 +167,7 @@ PrintDebugStuff(GameState state)
     {
         Client *c = &net.clients.entries[i];
         NetAddress address = c->address;
-        PlayerNum  player_index = c->player_index;
+        PlayerNum  player_num = c->player_num;
         Sequence   last_snap_ack = c->last_snap_ack;
         GameInput  last_input = c->last_input;
         uint64     last_recv_time = c->last_recv_time;
@@ -173,14 +176,14 @@ PrintDebugStuff(GameState state)
         bool       connected = c->connected;
         if (connected)
         {
-            printf("%d ", player_index);
+            printf("%d ", player_num);
             printf("%d.%d.%d.%d:%d ",
                    address.ip0, address.ip1,
                    address.ip2, address.ip3,
                    address.port);
             printf("%.2f %.2f\n",
-                   state.players[player_index].x,
-                   state.players[player_index].y);
+                   state.players[player_num].x,
+                   state.players[player_num].y);
         }
     }
     printf("%.2f KBps out", stats.avg_bytes_sent / 1024);
@@ -221,7 +224,8 @@ main(int argc, char **argv)
                 Client *c = &net.clients.entries[i];
                 if (!c->connected)
                     continue;
-                int input_index = c->player_index;
+                c->last_cmd_used = c->last_cmd_recv;
+                int input_index = c->player_num;
                 inputs[input_index] = c->last_input;
             }
             GameTick(state, inputs, tick_interval);
@@ -242,8 +246,7 @@ main(int argc, char **argv)
                 1.0f / float(rate))
             {
                 c->last_send_time = GetTick();
-                SendUpdate(net.clients.entries[i].address, state,
-                           c->last_cmd_recv);
+                SendUpdate(*c, state);
             }
 
             if (TimeSince(c->last_recv_time) >
@@ -252,7 +255,7 @@ main(int argc, char **argv)
                 printf("Client %d.%d.%d.%d timed out.\n",
                        c->address.ip0, c->address.ip1,
                        c->address.ip2, c->address.ip3);
-                GameDropPlayer(state, c->player_index);
+                GameDropPlayer(state, c->player_num);
                 net.clients.Remove(i);
             }
         }

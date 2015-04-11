@@ -169,16 +169,16 @@ PredictState(
     GameInput  *global_inputs, // The other players's latest input
     PlayerNum   player_index,  // Our player index
     RingBuffer  input_history,
-    Sequence    last_acknowledged_input,
+    Sequence    last_processed_input,
     float       dt)
 {
     InputHistoric *input = RingPopStruct(input_history, InputHistoric);
-    while (input && input->sequence < last_acknowledged_input)
+    while (input && input->sequence <= last_processed_input)
         input = RingPopStruct(input_history, InputHistoric);
     GameState result = initial_state;
     while (input)
     {
-        printf(".");
+        printf("%d ", input->sequence);
         global_inputs[player_index] = input->input;
         GameTick(result, global_inputs, dt);
         input = RingPopStruct(input_history, InputHistoric);
@@ -258,6 +258,14 @@ main(int argc, char **argv)
         }
 
         if (net.connected &&
+            TimeSince(last_update_recv) >
+            server_timeout_interval)
+        {
+            printf("Lost connection to server.\n");
+            net.connected = false;
+        }
+
+        if (net.connected &&
             TimeSince(last_update_sent) >
             send_update_interval)
         {
@@ -265,16 +273,16 @@ main(int argc, char **argv)
             PollInput(input);
 
             SendInput(input);
+            InputHistoric *next = RingPushStruct(input_history, InputHistoric);
+            if (!next)
+            {
+                RingPopStruct(input_history, InputHistoric);
+                next = RingPushStruct(input_history, InputHistoric);
+            }
+            next->input = input;
+            next->sequence = net.input_sequence;
             net.input_sequence++;
             last_update_sent = frame_tick;
-        }
-
-        if (net.connected &&
-            TimeSince(last_update_recv) >
-            server_timeout_interval)
-        {
-            printf("Lost connection to server.\n");
-            net.connected = false;
         }
 
         NetAddress sender = {};
@@ -295,6 +303,7 @@ main(int argc, char **argv)
                     break;
 
                 net.last_server_snap = update.sequence;
+                net.player_num = update.player_num;
 
                 state_server = update.state;
                 state_predicted = PredictState(update.state,
@@ -317,28 +326,18 @@ main(int argc, char **argv)
         if (net.connected &&
             TimeSince(last_game_tick) > tick_interval)
         {
-            InputHistoric *next = RingPushStruct(input_history, InputHistoric);
-            if (!next)
-            {
-                RingPopStruct(input_history, InputHistoric);
-                next = RingPushStruct(input_history, InputHistoric);
-            }
-            next->input = input;
-            next->sequence = net.input_sequence;
-
             update.inputs[net.player_num] = input;
             last_game_tick = frame_tick;
             GameTick(memory.state, update.inputs, tick_interval);
-            memory.state = InterpolateState(memory.state, state_predicted, 0.12f);
+            memory.state = InterpolateState(memory.state, state_predicted, 0.22f);
         }
 
         renderer.SetColor(PAL16_VOID);
         renderer.Clear();
-        DebugGameRender(state_server, renderer, PAL16_ASH);
+        // DebugGameRender(state_server, renderer, PAL16_ASH);
         DebugGameRender(state_predicted, renderer, PAL16_SEABLUE);
-        DebugGameRender(memory.state, renderer, PAL16_BLAZE);
+        // DebugGameRender(memory.state, renderer, PAL16_BLAZE);
         // GameRender(memory, renderer);
-
         SDL_RenderPresent(app.renderer);
 
         // NetStats stats = NetGetStats();
