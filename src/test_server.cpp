@@ -206,7 +206,7 @@ main(int argc, char **argv)
 
     uint64 initial_tick = GetTick();
     uint64 last_game_tick = initial_tick;
-    int tickrate = 20;
+    int tickrate = 48;
     float tick_interval = 1.0f / float(tickrate);
     float client_timeout_interval = 5.0f;
     app.running = true;
@@ -232,7 +232,7 @@ main(int argc, char **argv)
             last_game_tick = tick;
             net.sequence++;
 
-            PrintDebugStuff(state);
+            // PrintDebugStuff(state);
         }
 
         for (int i = 0; i < MAX_PLAYER_COUNT; i++)

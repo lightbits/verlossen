@@ -5,6 +5,15 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 16 (April 13. 2015)###
+Hmmm. There is something slightly off about the prediction scheme I'm running.
+I think it may have to do with some timing issues. I also realized that having
+vsync enabled caps your game loop to running at a maximum rate, which is not
+good if you want to send network updates at a rate higher than 60fps! So I'm
+trying to wrap my head around all this, but I have no progress to show today.
+
+Instead I'll refer to a fantastic, practical talk about networking for games by Glenn Fiedler. His main focus is for physics, but I managed to take alot of good information from it. Check it out [here](http://gdcvault.com/play/1022195/Physics-for-Game-Programmers-Networking).
+
 ###Day 15 (April 9. 2015)###
 Alright, I did some due diligence and found out that guesstimating round-trip-time was the wrong way to go. This article [here](http://www.gabrielgambetta.com/fpm_live.html) shows an approach where the server tells the client which input it processed last. Given that information, we can predict the server state more accurately by playing back inputs from the last one we know was processed! Here's how it looks:
 

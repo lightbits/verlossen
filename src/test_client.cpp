@@ -26,6 +26,7 @@ struct Network
     PlayerNum player_num; // We get this from the server when we connect
     Sequence input_sequence;
     Sequence last_server_snap;
+    Sequence last_locally_used_input;
 };
 
 struct InputHistoric
@@ -169,22 +170,23 @@ PredictState(
     GameInput  *global_inputs, // The other players's latest input
     PlayerNum   player_index,  // Our player index
     RingBuffer  input_history,
-    Sequence    last_processed_input,
+    Sequence    last_server_used,
+    Sequence    last_local_used,
     float       dt)
 {
     InputHistoric *input = RingPopStruct(input_history, InputHistoric);
-    while (input && input->sequence <= last_processed_input)
+    while (input && input->sequence <= last_server_used)
         input = RingPopStruct(input_history, InputHistoric);
     GameState result = initial_state;
-    while (input)
+    while (input && input->sequence <= last_local_used)
     {
-        printf("%d ", input->sequence);
+        // printf("%d ", input->sequence);
         global_inputs[player_index] = input->input;
         GameTick(result, global_inputs, dt);
         input = RingPopStruct(input_history, InputHistoric);
 
     }
-    printf("\n");
+    // printf("\n");
     return result;
 }
 
@@ -192,8 +194,8 @@ int
 main(int argc, char **argv)
 {
     int listen_port = 54321;
-    net.cmd_rate = 20;
-    net.rate = 20;
+    net.cmd_rate = 48;
+    net.rate = 48;
     if (argc >= 2)
     {
         sscanf(argv[1], "%d", &listen_port);
@@ -234,7 +236,7 @@ main(int argc, char **argv)
 
     app.running = true;
     net.connected = false;
-    app.tickrate = 20;
+    app.tickrate = 48;
     uint64 initial_tick               = SDL_GetPerformanceCounter();
     uint64 last_connection_attempt    = initial_tick;
     uint64 last_update_sent           = initial_tick;
@@ -311,7 +313,13 @@ main(int argc, char **argv)
                                net.player_num,
                                input_history,
                                update.acknowledge,
+                               net.last_locally_used_input,
                                tick_interval);
+
+                printf("%f %f\n", memory.state.players[0].x, state_predicted.players[0].x);
+
+                // TODO: Instead of snapping, do some interpolation?
+                // memory.state = state_predicted;
 
                 // Inputs that are yet to be processed by the server:
                 // printf("unprocessed: %d\n", net.input_sequence - update.acknowledge);
@@ -326,17 +334,19 @@ main(int argc, char **argv)
         if (net.connected &&
             TimeSince(last_game_tick) > tick_interval)
         {
+            net.last_locally_used_input = net.input_sequence - 1;
             update.inputs[net.player_num] = input;
-            last_game_tick = frame_tick;
+            last_game_tick = SDL_GetPerformanceCounter();
             GameTick(memory.state, update.inputs, tick_interval);
-            memory.state = InterpolateState(memory.state, state_predicted, 0.22f);
+            // memory.state = InterpolateState(memory.state, state_predicted, 0.22f);
+
+            renderer.SetColor(PAL16_VOID);
+            renderer.Clear();
+            DebugGameRender(state_server, renderer, PAL16_ASH);
+            DebugGameRender(state_predicted, renderer, PAL16_SEABLUE);
+            DebugGameRender(memory.state, renderer, PAL16_BLAZE);
         }
 
-        renderer.SetColor(PAL16_VOID);
-        renderer.Clear();
-        // DebugGameRender(state_server, renderer, PAL16_ASH);
-        DebugGameRender(state_predicted, renderer, PAL16_SEABLUE);
-        // DebugGameRender(memory.state, renderer, PAL16_BLAZE);
         // GameRender(memory, renderer);
         SDL_RenderPresent(app.renderer);
 
