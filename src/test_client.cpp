@@ -39,6 +39,15 @@ static Network net;
 static App app;
 
 void
+PrintNetStats()
+{
+    NetStats stats = NetGetStats();
+    printf("\r");
+    printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
+    printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
+}
+
+void
 PlatformRendererSetColor(uint32 color)
 {
     SDL_SetRenderDrawColor(app.renderer,
@@ -164,6 +173,7 @@ InterpolateState(GameState a, GameState b, float t)
     return result;
 }
 
+
 GameState
 PredictState(
     GameState   initial_state,
@@ -190,12 +200,45 @@ PredictState(
     return result;
 }
 
+bool
+PollNetwork(ServerUpdate &result)
+{
+    bool got_something = false;
+    NetAddress sender = {};
+    ServerUpdate update = {};
+    while (NetRead(update, sender))
+    {
+        got_something = true;
+        switch (update.protocol)
+        {
+        case SV_ACCEPT:
+            net.last_server_snap = update.sequence;
+            net.connected = true;
+            net.player_num = update.player_num;
+            break;
+
+        case SV_UPDATE:
+            if (!IsPacketMoreRecent(net.last_server_snap, update.sequence))
+                break;
+
+            net.last_server_snap = update.sequence;
+            net.player_num = update.player_num;
+
+            // Inputs that are yet to be processed by the server:
+            // printf("unprocessed: %d\n", net.input_sequence - update.acknowledge);
+            break;
+        }
+    }
+    result = update;
+    return got_something;
+}
+
 int
 main(int argc, char **argv)
 {
     int listen_port = 54321;
-    net.cmd_rate = 48;
-    net.rate = 48;
+    net.cmd_rate = 20;
+    net.rate = 20;
     if (argc >= 2)
     {
         sscanf(argv[1], "%d", &listen_port);
@@ -236,7 +279,7 @@ main(int argc, char **argv)
 
     app.running = true;
     net.connected = false;
-    app.tickrate = 48;
+    app.tickrate = 20;
     uint64 initial_tick               = SDL_GetPerformanceCounter();
     uint64 last_connection_attempt    = initial_tick;
     uint64 last_update_sent           = initial_tick;
@@ -287,46 +330,19 @@ main(int argc, char **argv)
             last_update_sent = frame_tick;
         }
 
-        NetAddress sender = {};
         ServerUpdate update = {};
-        while (NetRead(update, sender))
+        if (PollNetwork(update))
         {
             last_update_recv = GetTick();
-            switch (update.protocol)
-            {
-            case SV_ACCEPT:
-                net.last_server_snap = update.sequence;
-                net.connected = true;
-                net.player_num = update.player_num;
-                break;
-
-            case SV_UPDATE:
-                if (!IsPacketMoreRecent(net.last_server_snap, update.sequence))
-                    break;
-
-                net.last_server_snap = update.sequence;
-                net.player_num = update.player_num;
-
-                state_server = update.state;
-                state_predicted = PredictState(update.state,
-                               update.inputs,
-                               net.player_num,
-                               input_history,
-                               update.acknowledge,
-                               net.last_locally_used_input,
-                               tick_interval);
-
-                printf("%f %f\n", memory.state.players[0].x, state_predicted.players[0].x);
-
-                // TODO: Instead of snapping, do some interpolation?
-                // memory.state = state_predicted;
-
-                // Inputs that are yet to be processed by the server:
-                // printf("unprocessed: %d\n", net.input_sequence - update.acknowledge);
-                break;
-            }
+            state_server = update.state;
+            state_predicted = PredictState(update.state,
+                           update.inputs,
+                           net.player_num,
+                           input_history,
+                           update.acknowledge,
+                           net.last_locally_used_input,
+                           tick_interval);
         }
-
 
         if (input.action1.is_down)
             memory.state = state_server;
@@ -347,14 +363,7 @@ main(int argc, char **argv)
             DebugGameRender(memory.state, renderer, PAL16_BLAZE);
         }
 
-        // GameRender(memory, renderer);
         SDL_RenderPresent(app.renderer);
-
-        // NetStats stats = NetGetStats();
-        // printf("\r");
-        // printf("x = %.2f", memory.state.players[0].x);
-        // printf("\tavg %.2f KBps out", stats.avg_bytes_sent / 1024);
-        // printf("\t%.2f KBps in", stats.avg_bytes_read / 1024);
     }
 
     return 0;

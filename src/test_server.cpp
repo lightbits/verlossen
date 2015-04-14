@@ -206,17 +206,16 @@ main(int argc, char **argv)
 
     uint64 initial_tick = GetTick();
     uint64 last_game_tick = initial_tick;
-    int tickrate = 48;
-    float tick_interval = 1.0f / float(tickrate);
-    float client_timeout_interval = 5.0f;
+    int tickrate = 20;
+    float tick_in_seconds = 1.0f / float(tickrate);
+    float timeout_in_seconds = 5.0f;
     app.running = true;
     net.sequence = 0;
     while (app.running)
     {
-        uint64 tick = GetTick();
         PollNetwork(state);
 
-        if (TimeSince(last_game_tick) > tick_interval)
+        if (TimeSince(last_game_tick) > tick_in_seconds)
         {
             GameInput inputs[MAX_PLAYER_COUNT];
             for (int i = 0; i < MAX_PLAYER_COUNT; i++)
@@ -228,8 +227,8 @@ main(int argc, char **argv)
                 int input_index = c->player_num;
                 inputs[input_index] = c->last_input;
             }
-            GameTick(state, inputs, tick_interval);
-            last_game_tick = tick;
+            GameTick(state, inputs, tick_in_seconds);
+            last_game_tick = GetTick();
             net.sequence++;
 
             // PrintDebugStuff(state);
@@ -250,7 +249,7 @@ main(int argc, char **argv)
             }
 
             if (TimeSince(c->last_recv_time) >
-                client_timeout_interval)
+                timeout_in_seconds)
             {
                 printf("Client %d.%d.%d.%d timed out.\n",
                        c->address.ip0, c->address.ip1,
