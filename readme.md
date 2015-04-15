@@ -5,6 +5,35 @@ Play with your friend across the world using state-of-the-art internet technolog
 
 ##Development log:##
 
+###Day 17 (April 15. 2015)###
+Alright, sat down and worked out some kinks. My problem this whole time has
+basically been how to perform that prediction step on the client, so that
+there will be as little difference between what you have simulated locally
+and the latest server update.
+
+There were several things that threw me off while implementing this though.
+One, is that the game loop basically consists of things being done at
+different rates. The input is sampled and sent at one rate, but the game
+is being advanced at another. This meant that if the game tickrate was
+higher than the input sampling rate, then the same input would be applied
+for more than one frame.
+
+This was important to get right in the prediction routine.
+I fixed it by labelling each input, clientside, with a counter that
+increases each game tick. So if A and B are inputs, then B.label - A.label
+gives me the number of frames that B was used for.
+
+Second, is that VSync messed everything up. When VSync is enabled, a call
+to ``SDL_RenderPresent`` will essentially put the calling thread to sleep,
+until "vertical blank". Naturally, this is going to ruin all my timer loops,
+since I'm not using multiple threads.
+
+As of now I have VSync disabled, since I don't want to deal with threading.
+But it's probably something I'll want to have a look at.
+
+Anyway, it's fun when stuff works after fiddling with it for too long.
+All I have to show right now is just boring squares though.
+
 ###Day 16 (April 13. 2015)###
 Hmmm. There is something slightly off about the prediction scheme I'm running.
 I think it may have to do with some timing issues. I also realized that having

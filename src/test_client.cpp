@@ -117,7 +117,7 @@ CreateContext()
 
     app.renderer = SDL_CreateRenderer(
         app.window, -1,
-        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+        SDL_RENDERER_ACCELERATED/* | SDL_RENDERER_PRESENTVSYNC*/);
     if (!app.renderer)
         return false;
 
@@ -190,10 +190,25 @@ PredictState(
     GameState result = initial_state;
     while (input && input->sequence <= last_local_used)
     {
-        // printf("%d ", input->sequence);
+        // Since we sample inputs at a different rate than we
+        // advance the game state, the same input may have been
+        // applied during several ticks. To accomodate for this
+        // we repeat the input the corresponding amount of times,
+        // and hope that it will match roughly what the server
+        // also simulated.
+        int repeat_count = 0;
+        InputHistoric *next = RingPopStruct(input_history, InputHistoric);
+        if (next)
+            repeat_count = next->sequence - input->sequence;
+        else
+            repeat_count = last_local_used - input->sequence;
+
         global_inputs[player_index] = input->input;
-        GameTick(result, global_inputs, dt);
-        input = RingPopStruct(input_history, InputHistoric);
+        for (int i = 0; i < repeat_count; i++)
+        {
+            GameTick(result, global_inputs, dt);
+        }
+        input = next;
 
     }
     // printf("\n");
@@ -271,35 +286,34 @@ main(int argc, char **argv)
 
     GameState state_server    = {};
     GameState state_predicted = {};
+    ServerUpdate last_update = {};
 
-    const int MAX_INPUT_HISTORY = 32;
+    const int MAX_INPUT_HISTORY = 100;
     InputHistoric input_buffer[MAX_INPUT_HISTORY];
     RingBuffer input_history = MakeRingBuffer(
        (uint8*)input_buffer, MAX_INPUT_HISTORY);
 
     app.running = true;
     net.connected = false;
-    app.tickrate = 20;
+    app.tickrate = 66;
     uint64 initial_tick               = SDL_GetPerformanceCounter();
     uint64 last_connection_attempt    = initial_tick;
     uint64 last_update_sent           = initial_tick;
     uint64 last_update_recv           = initial_tick;
     uint64 last_game_tick             = initial_tick;
-    float tick_interval               = 1.0f / float(app.tickrate);
+    float tick_in_seconds             = 1.0f / float(app.tickrate);
     float send_update_interval        = 1.0f / float(net.cmd_rate);
     float connection_attempt_interval = 1.0f;
     float server_timeout_interval     = 2.0f;
     while (app.running)
     {
-        uint64 frame_tick = SDL_GetPerformanceCounter();
-
         if (!net.connected &&
             TimeSince(last_connection_attempt) >
             connection_attempt_interval)
         {
             printf("Attempting to connect.\n");
             SendConnect();
-            last_connection_attempt = frame_tick;
+            last_connection_attempt = GetTick();
         }
 
         if (net.connected &&
@@ -314,10 +328,9 @@ main(int argc, char **argv)
             TimeSince(last_update_sent) >
             send_update_interval)
         {
-            // Only poll as often as we send. Is this actually a good idea?
             PollInput(input);
-
             SendInput(input);
+
             InputHistoric *next = RingPushStruct(input_history, InputHistoric);
             if (!next)
             {
@@ -326,41 +339,49 @@ main(int argc, char **argv)
             }
             next->input = input;
             next->sequence = net.input_sequence;
-            net.input_sequence++;
-            last_update_sent = frame_tick;
+
+            last_update_sent = GetTick();
         }
 
         ServerUpdate update = {};
         if (PollNetwork(update))
         {
+            last_update = update;
             last_update_recv = GetTick();
-            state_server = update.state;
-            state_predicted = PredictState(update.state,
-                           update.inputs,
-                           net.player_num,
-                           input_history,
-                           update.acknowledge,
-                           net.last_locally_used_input,
-                           tick_interval);
         }
 
         if (input.action1.is_down)
             memory.state = state_server;
 
         if (net.connected &&
-            TimeSince(last_game_tick) > tick_interval)
+            TimeSince(last_game_tick) > tick_in_seconds)
         {
-            net.last_locally_used_input = net.input_sequence - 1;
+            last_game_tick = GetTick();
+
+            state_server = last_update.state;
+            state_predicted = PredictState(
+                       last_update.state,
+                       last_update.inputs,
+                       net.player_num,
+                       input_history,
+                       last_update.acknowledge,
+                       net.input_sequence - 1,
+                       tick_in_seconds);
+
             update.inputs[net.player_num] = input;
-            last_game_tick = SDL_GetPerformanceCounter();
-            GameTick(memory.state, update.inputs, tick_interval);
-            // memory.state = InterpolateState(memory.state, state_predicted, 0.22f);
+            GameTick(memory.state, update.inputs, tick_in_seconds);
+            net.input_sequence++;
+
+            memory.state =
+                InterpolateState(memory.state, state_predicted, 0.1f);
 
             renderer.SetColor(PAL16_VOID);
             renderer.Clear();
             DebugGameRender(state_server, renderer, PAL16_ASH);
             DebugGameRender(state_predicted, renderer, PAL16_SEABLUE);
             DebugGameRender(memory.state, renderer, PAL16_BLAZE);
+
+            PrintNetStats();
         }
 
         SDL_RenderPresent(app.renderer);

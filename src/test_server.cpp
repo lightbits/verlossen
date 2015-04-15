@@ -206,7 +206,7 @@ main(int argc, char **argv)
 
     uint64 initial_tick = GetTick();
     uint64 last_game_tick = initial_tick;
-    int tickrate = 20;
+    int tickrate = 66;
     float tick_in_seconds = 1.0f / float(tickrate);
     float timeout_in_seconds = 5.0f;
     app.running = true;
