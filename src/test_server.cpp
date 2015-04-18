@@ -195,8 +195,8 @@ PrintDebugStuff(GameState state)
                    address.ip2, address.ip3,
                    address.port);
             printf("%.2f %.2f\n",
-                   state.players[player_num].x,
-                   state.players[player_num].y);
+                   state.players[player_num].position.x,
+                   state.players[player_num].position.y);
         }
     }
     printf("%.2f KBps out", stats.avg_bytes_sent / 1024);

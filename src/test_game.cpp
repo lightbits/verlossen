@@ -15,6 +15,12 @@ void
 GameInit(GameState &state)
 {
     state.player_count = 0;
+
+    // TODO: Render-agnostic coordinates for game objects
+    // just pass NDC or whatever to draw functions here,
+    // and convert to screen coords using GameRenderer
+    state.map_dimensions.x = 320.0f;
+    state.map_dimensions.y = 160.0f;
 }
 
 PlayerNum
@@ -30,8 +36,26 @@ GameAddPlayer(GameState &state)
     Assert(index < MAX_PLAYER_COUNT);
     GamePlayer player = {};
     player.connected = true;
-    player.x = 0;
-    player.y = 0;
+
+    switch (index)
+    {
+        case 0:
+            player.position.x = state.map_dimensions.x / 8.0f;
+            player.position.y = state.map_dimensions.y / 2.0f;
+            break;
+        case 1:
+            player.position.x = state.map_dimensions.x * 7.0f / 8.0f;
+            player.position.y = state.map_dimensions.y / 2.0f;
+            break;
+        case 2:
+            player.position.x = state.map_dimensions.x / 2.0f;
+            player.position.y = state.map_dimensions.y / 8.0f;
+            break;
+        case 3:
+            player.position.x = state.map_dimensions.x / 2.0f;
+            player.position.y = state.map_dimensions.y * 7.0f / 2.0f;
+            break;
+    }
     state.players[index] = player;
     state.player_count++;
     return PlayerNum(index);
@@ -48,11 +72,11 @@ GameDropPlayer(GameState &state, PlayerNum index)
 void
 PlayerTick(GamePlayer &player, GameInput &input, float dt)
 {
-    float speed = 40.0f;
-    if (input.left.is_down)  player.x -= speed * dt;
-    if (input.right.is_down) player.x += speed * dt;
-    if (input.down.is_down)  player.y -= speed * dt;
-    if (input.up.is_down)    player.y += speed * dt;
+    // float speed = 40.0f;
+    // if (input.left.is_down)  player.x -= speed * dt;
+    // if (input.right.is_down) player.x += speed * dt;
+    // if (input.down.is_down)  player.y -= speed * dt;
+    // if (input.up.is_down)    player.y += speed * dt;
 }
 
 void
@@ -72,11 +96,11 @@ DebugDrawPlayer(GameRenderer &render,
                 GamePlayer &player,
                 uint32 color)
 {
-    int w = 20;
-    int h = 20;
-    int x = player.x + w / 2;
-    int y = render.res_y - player.y - h;
-    DrawDebugRectangle(render, x, y, 20, 20, color);
+    int w = 15;
+    int h = 60;
+    int x = int(player.position.x) - w / 2;
+    int y = render.res_y - int(player.position.y) - h / 2;
+    DrawDebugRectangle(render, x, y, w, h, color);
 }
 
 void

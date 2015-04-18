@@ -1,17 +1,15 @@
 Todo
 ====
 
-[] Seperate application into server and client
-   Should server be a different app?
-   Maybe write it in Go? Or Python!
-[] Implement list of connections on server
-[] Implement sending user input over several
-   frames in same network packet.
+[] Asteroids-ish shooter
+[] Minimap
+[] Star-field
+[] Procedurally rendered asteroids (given seed, render)
+[] Procedurally rendered BG (fractal, mandelbrot, etc...)
+   (3d raymarch?)
 [] Implement udp sockets on Linux
 [] Test on Linux
 [] Test over real network
-[] Proper animation
-[] Tilemaps? Or just handdraw the bg?
 
 UPnP and NAT traversal
 ----------------------

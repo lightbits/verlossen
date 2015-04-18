@@ -1,6 +1,7 @@
 #ifndef _test_game_h_
 #define _test_game_h_
 #include "palette.h"
+#include "matrix.h"
 
 #define CL_CONNECT 0xDEADBEEF
 #define CL_UPDATE  0xABABABAB
@@ -57,14 +58,15 @@ struct GameInput
 
 struct GamePlayer
 {
-    float x;
-    float y;
+    vec2 position;
+    vec2 velocity;
     bool connected;
 };
 
 struct GameState
 {
     GamePlayer players[MAX_PLAYER_COUNT];
+    vec2 map_dimensions;
     int player_count;
 };
 

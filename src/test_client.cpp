@@ -153,12 +153,18 @@ Lerp(float a, float b, float t)
     return a + (b - a) * t;
 }
 
+vec2
+Lerp(vec2 a, vec2 b, float t)
+{
+    return Vec2(Lerp(a.x, b.x, t), Lerp(a.y, b.y, t));
+}
+
 GamePlayer
 InterpolatePlayer(GamePlayer &a, GamePlayer &b, float t)
 {
     GamePlayer result = a;
-    result.x = Lerp(a.x, b.x, t);
-    result.y = Lerp(a.y, b.y, t);
+    result.position = Lerp(a.position, b.position, t);
+    // result.velocity = ??
     return result;
 }
 
@@ -380,7 +386,7 @@ main(int argc, char **argv)
             renderer.Clear();
             GameRender(memory, renderer);
 
-            // PrintNetStats();
+            PrintNetStats();
         }
 
         SDL_RenderPresent(app.renderer);

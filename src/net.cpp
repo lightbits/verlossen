@@ -183,8 +183,8 @@ struct GameInputPacket
 
 struct GamePlayerPacket
 {
-    float x;
-    float y;
+    vec2 position;
+    vec2 velocity;
     bool connected;
 };
 
@@ -208,16 +208,16 @@ struct ServerUpdatePacket
 
 void ReadPlayer(GamePlayerPacket &packet, GamePlayer &player)
 {
-    player.x = packet.x;
-    player.y = packet.y;
+    player.position = packet.position;
+    player.velocity = packet.velocity;
     player.connected = packet.connected;
 }
 
 void WritePlayer(GamePlayer &player, GamePlayerPacket &packet)
 {
     // TODO: Compression and stuff, when we get real variables here
-    packet.x = player.x;
-    packet.y = player.y;
+    packet.position = player.position;
+    packet.velocity = player.velocity;
     packet.connected = player.connected;
 }
 
