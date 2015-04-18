@@ -27,6 +27,12 @@ uint8 ip2, uint8 ip3, uint16 port)
     return result;
 }
 
+bool
+IsSameAddress(NetAddress &a, NetAddress &b)
+{
+    return a.ip_bytes == b.ip_bytes && a.port == b.port;
+}
+
 void
 NetSetPreferredListenPort(uint16 port)
 {

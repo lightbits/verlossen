@@ -31,16 +31,27 @@ struct ClientList
     }
 
     Client *
-    Add(NetAddress &address)
+    Add(NetAddress &address, bool &preexisting)
     {
         if (count >= MAX_PLAYER_COUNT)
             return 0;
+
+        // It might be a dropped client who wishes to reconnect
+        preexisting = false;
+        for (int i = 0; i < MAX_PLAYER_COUNT; i++) {
+            if (IsSameAddress(address, entries[i].address)) {
+                preexisting = true;
+                return &entries[i];
+            }
+        }
+
         // Find first available slot
         int slot = 0;
         while (slot < MAX_PLAYER_COUNT &&
                entries[slot].connected) {
             slot++;
         }
+
         Assert(slot < MAX_PLAYER_COUNT);
         Client c = {};
         c.address = address;
@@ -122,10 +133,12 @@ PollNetwork(GameState &state)
         {
         case CL_CONNECT:
         {
-            Client *c = net.clients.Add(sender);
+            bool preexisting = false;
+            Client *c = net.clients.Add(sender, preexisting);
             if (c)
             {
-                c->player_num = GameAddPlayer(state);
+                if (!preexisting)
+                   c->player_num = GameAddPlayer(state);
                 c->last_snap_ack = incoming.acknowledge;
                 c->last_cmd_recv = incoming.sequence;
                 c->last_recv_time = GetTick();

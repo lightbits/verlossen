@@ -88,17 +88,7 @@ GameRender(GameMemory &memory,
     for (int i = 0; i < MAX_PLAYER_COUNT; i++)
     {
         uint32 color = PAL16[1 + i % 15];
-        DebugDrawPlayer(render, memory.state.players[i], color);
-    }
-}
-
-void
-DebugGameRender(GameState &state,
-                GameRenderer &render,
-                uint32 color)
-{
-    for (int i = 0; i < MAX_PLAYER_COUNT; i++)
-    {
-        DebugDrawPlayer(render, state.players[i], color);
+        if (memory.state.players[i].connected)
+            DebugDrawPlayer(render, memory.state.players[i], color);
     }
 }

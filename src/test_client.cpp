@@ -168,11 +168,15 @@ InterpolateState(GameState a, GameState b, float t)
     GameState result = a;
     for (int i = 0; i < MAX_PLAYER_COUNT; i++)
     {
-        result.players[i] = InterpolatePlayer(a.players[i], b.players[i], t);
+        if (a.players[i].connected != b.players[i].connected)
+        {
+            result.players[i] = b.players[i];
+        }
+        result.players[i] = InterpolatePlayer(
+              result.players[i], b.players[i], t);
     }
     return result;
 }
-
 
 GameState
 PredictState(
@@ -350,9 +354,6 @@ main(int argc, char **argv)
             last_update_recv = GetTick();
         }
 
-        if (input.action1.is_down)
-            memory.state = state_server;
-
         if (net.connected &&
             TimeSince(last_game_tick) > tick_in_seconds)
         {
@@ -377,11 +378,9 @@ main(int argc, char **argv)
 
             renderer.SetColor(PAL16_VOID);
             renderer.Clear();
-            DebugGameRender(state_server, renderer, PAL16_ASH);
-            DebugGameRender(state_predicted, renderer, PAL16_SEABLUE);
-            DebugGameRender(memory.state, renderer, PAL16_BLAZE);
+            GameRender(memory, renderer);
 
-            PrintNetStats();
+            // PrintNetStats();
         }
 
         SDL_RenderPresent(app.renderer);
