@@ -46,13 +46,13 @@ Instead I'll refer to a fantastic, practical talk about networking for games by 
 ###Day 15 (April 9. 2015)###
 Alright, I did some due diligence and found out that guesstimating round-trip-time was the wrong way to go. This article [here](http://www.gabrielgambetta.com/fpm_live.html) shows an approach where the server tells the client which input it processed last. Given that information, we can predict the server state more accurately by playing back inputs from the last one we know was processed! Here's how it looks:
 
-![](./data/predict2.gif)
+![](./devlog/predict2.gif)
 
 Notice how there's no error at the end, as opposed to my previous attempt.
 
 So yesterday I mentioned that there was another problem, namely the jitter that is apparent from the motion of the blue square. I made an attempt to fix that today, by a simple linear combination that I apply each frame. It looks like this:
 
-![](./data/predict_lerp.gif)
+![](./devlog/predict_lerp.gif)
 
 The way it works is something like
 
@@ -70,14 +70,14 @@ where **InterpolateState** performs the blending **(A = A + (B - A) * lerp)** fo
 
 Interpolation is particularly useful if you have packet drop (say 40% of it, as in the gif), since it hides most of the extreme jitter that would otherwise make the game unplayable:
 
-![](./data/predict_lerp_drop.gif)
+![](./devlog/predict_lerp_drop.gif)
 
 If you look closely, you can see the orange square speeding up and slowing down. This is something I would like to fix. Perhaps by using a different interpolation function?
 
 ###Day 14 (April 8. 2015)###
 Sweet! I think I've got something that sorta kinda works now! The gif below shows my progress. The white square is the server state, the orange is our locally simulated state and the blue square is the predicted state.
 
-![](./data/predict.gif)
+![](./devlog/predict.gif)
 
 The problem I was trying to solve was sort of vague and floaty until I actually sat down with pen and paper today. The previous devlog entries didn't really explain what the issue was, or how to solve it. But I think I can do a better attempt now.
 
@@ -108,7 +108,7 @@ The issue here is two-fold.
 
 I don't really know what to do about the first issue, so I'll only consider the second issue. Now why is the snapshot delay a problem? Let me show you:
 
-![](./data/lag.gif)
+![](./devlog/lag.gif)
 
 As before, orange square is local simulation, white is server update.
 
@@ -144,7 +144,7 @@ Started implementing prediction and interpolation today. If we run the game loca
 
 Here's a gif showing how we get jitter if we simply set the local state equal to the incoming server update
 
-![](./data/jitter.gif)
+![](./devlog/jitter.gif)
 
 Totally not cool!
 
@@ -238,20 +238,20 @@ To illustrate in beautiful pixellated graphics, say we have received
 the state for timesteps 0 to 1, but we have a higher framerate than
 our update rate, and we are currently rendering the state at timestep 5.
 
-![](./data/prediction_1.png)
+![](./devlog/prediction_1.png)
 
 To get there, we had to predict what the game would look like for
 frames 2 throughout 5, given the last server update and our input
 at those frames. Say we now get a new update from the server:
 
-![](./data/prediction_2.png)
+![](./devlog/prediction_2.png)
 
 Because the server represents the **true** game state, shared with
 all clients, we need to synchronize with it. But if we reset our
 state to the incoming update, we would clearly be rendering an old
 state!
 
-![](./data/prediction_3.png)
+![](./devlog/prediction_3.png)
 
 Instead, what we can do is reset our state to the incoming server
 state, and predict frames 3 through 5 again, but now with a different
@@ -297,7 +297,7 @@ program, you need to get those right.
 
 Here's some pixels.
 
-![](./data/gang.png)
+![](./devlog/gang.png)
 
 * Source files: Too many
 * Player count: 0 (dang)
@@ -386,7 +386,7 @@ read from one end, and written to on the other. A first-in-first-out sort
 of thing. So I implemented a ring buffer. It's like an array, but shaped
 like a snake:
 
-![](data/ringbuffer.png)
+![](./devlog/ringbuffer.png)
 
 At any moment, you may read from a location that has been written (blue).
 And you may write to a location that is available (gray). Already read
@@ -399,9 +399,9 @@ relatively as often as you write, you never run out of space!
 ###Day 3 (March 3. 2015)###
 Spent some time making a running animation and a sort of idle animation. The game (if I can call it that) looks alot more spenstig now - as we say in Norway.
 
-![](data/hero_run.gif)
-![](data/hero_stand.gif)
-![](data/ingame_run.gif)
+![](./devlog/hero_run.gif)
+![](./devlog/hero_stand.gif)
+![](./devlog/ingame_run.gif)
 
 Regarding the network code: I'm thinking I'll need to make one of the players a "host" or "master" sort of thing. My argument is that if the game will have enemy entities that both players can interact with, then someone needs to simulate those enemies.
 
@@ -426,7 +426,7 @@ On every consequent update, I update the second player's position whenever I get
 * **Source files**: 9
 * **Player count**: 2
 
-![](data/preview_02.png)
+![](./devlog/preview_02.png)
 
 Also, note the slight art modification. Our hero is no longer a vampire! (What is he though, a bard?)
 
@@ -438,7 +438,7 @@ Made character and scenery artwork. This might be the best art that my hands hav
 * **Art assets**: 2
 * **Source files**: 9
 
-![](data/preview_01.png)
+![](./devlog/preview_01.png)
 
 ###Day ?? (??)###
 Wrote the machinery that will hold this thing together. Compile times are fast, which is a good sign. Wrote some rudimentary socket code, but only for windows. I suspect that socket programming is pretty similiar on linux as well though, so porting will be a breeze.
